@@ -15,7 +15,9 @@ import {
   ListItemText,
   Avatar,
   Tooltip,
+  Chip,
 } from '@mui/material';
+import { usePresence } from '../../context/PresenceContext';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -50,6 +52,8 @@ export default function DashboardLayout({ children }) {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleLogout = () => logout();
+
+  const { totalDevices, totalRestaurantsOnline, connected } = usePresence();
 
   const isActive = (path) =>
     path === '/'
@@ -139,6 +143,28 @@ export default function DashboardLayout({ children }) {
             {currentTitle}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Tooltip title={connected
+              ? `${totalDevices} device(s) online across ${totalRestaurantsOnline} restaurant(s)`
+              : 'Connecting to live presence…'}>
+              <Chip
+                size="small"
+                label={`${totalDevices} online`}
+                variant="outlined"
+                sx={{
+                  fontWeight: 700,
+                  borderColor: connected ? 'success.main' : 'divider',
+                  color: connected ? 'success.main' : 'text.secondary',
+                  '& .MuiChip-icon': { ml: 1 },
+                }}
+                icon={
+                  <Box sx={{
+                    width: 9, height: 9, borderRadius: '50%',
+                    bgcolor: connected ? 'success.main' : 'text.disabled',
+                    boxShadow: connected ? '0 0 0 3px rgba(22,163,74,0.18)' : 'none',
+                  }} />
+                }
+              />
+            </Tooltip>
             <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
               <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
                 {displayName}

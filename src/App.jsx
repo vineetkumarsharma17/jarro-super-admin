@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PresenceProvider } from './context/PresenceContext';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -223,7 +224,9 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <HashRouter>
-          <AppRoutes />
+          <PresenceProvider>
+            <AppRoutes />
+          </PresenceProvider>
         </HashRouter>
       </AuthProvider>
     </ThemeProvider>

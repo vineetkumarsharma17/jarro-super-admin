@@ -9,10 +9,12 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Tooltip,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
+import { usePresence } from '../../context/PresenceContext';
 import DataTable from '../../components/common/DataTable';
 import Breadcrumb from '../../components/common/Breadcrumb';
 
@@ -27,6 +29,7 @@ export default function RestaurantList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const { isOnline, deviceCount } = usePresence();
 
   const breadcrumbItems = [
     { label: 'Restaurants' },
@@ -57,6 +60,30 @@ export default function RestaurantList() {
 
   // Column configuration
   const columns = [
+    {
+      field: 'online',
+      headerName: 'Live',
+      align: 'center',
+      width: '70px',
+      render: (row) => {
+        const online = isOnline(row._id);
+        const n = deviceCount(row._id);
+        return (
+          <Tooltip title={online ? `Online · ${n} device${n === 1 ? '' : 's'}` : 'Offline'}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{
+                width: 10, height: 10, borderRadius: '50%',
+                bgcolor: online ? 'success.main' : 'error.main',
+                boxShadow: online ? '0 0 0 3px rgba(22,163,74,0.18)' : 'none',
+              }} />
+              {online && n > 1 && (
+                <Typography variant="caption" color="text.secondary">{n}</Typography>
+              )}
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
     {
       field: 'name',
       headerName: 'Name',
