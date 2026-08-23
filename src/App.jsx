@@ -13,7 +13,7 @@ import RestaurantView from './pages/Restaurants/RestaurantView';
 import RestaurantMenus from './pages/Restaurants/RestaurantMenus';
 import RestaurantCategories from './pages/Restaurants/RestaurantCategories';
 import RestaurantTables from './pages/Restaurants/RestaurantTables';
-import BannerManagement from './pages/Settings/BannerManagement';
+import Settings from './pages/Settings/Settings';
 import UserList from './pages/Users/UserList';
 import Analytics from './pages/Analytics/Analytics';
 
@@ -209,7 +209,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardLayout>
-              <BannerManagement />
+              <Settings />
             </DashboardLayout>
           </ProtectedRoute>
         }

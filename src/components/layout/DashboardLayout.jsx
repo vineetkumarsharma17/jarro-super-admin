@@ -31,6 +31,9 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+import { getPublicSystemStatus } from '../../services/systemService';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
 const drawerWidth = 248;
 
 const menuItems = [
@@ -43,8 +46,29 @@ const menuItems = [
 
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
+  const [maintenanceMsg, setMaintenanceMsg] = useState('');
   const location = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
+
+  React.useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const res = await getPublicSystemStatus();
+        if (res && res.maintenance) {
+          setIsMaintenanceActive(true);
+          setMaintenanceMsg(res.message || 'System is in Maintenance Mode');
+        } else {
+          setIsMaintenanceActive(false);
+        }
+      } catch (err) {
+        // Silently handle status check
+      }
+    };
+    checkMaintenance();
+    const interval = setInterval(checkMaintenance, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -218,6 +242,42 @@ export default function DashboardLayout({ children }) {
         }}
       >
         <Toolbar />
+        {isMaintenanceActive && (
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 2,
+              bgcolor: '#fee2e2',
+              border: '1px solid #fca5a5',
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'space-between',
+              gap: 2,
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <WarningAmberIcon color="error" />
+              <Box>
+                <Typography variant="subtitle2" color="error.main" fontWeight={700}>
+                  SYSTEM MAINTENANCE MODE IS CURRENTLY ACTIVE
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {maintenanceMsg} — Non-super-admin traffic is blocked.
+                </Typography>
+              </Box>
+            </Box>
+            <Chip
+              component={Link}
+              to="/settings"
+              label="Manage Settings"
+              color="error"
+              clickable
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
+          </Box>
+        )}
         {children}
       </Box>
     </Box>
