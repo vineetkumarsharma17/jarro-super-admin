@@ -44,10 +44,14 @@ const menuItems = [
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
+import CampaignIcon from '@mui/icons-material/Campaign';
+
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
   const [maintenanceMsg, setMaintenanceMsg] = useState('');
+  const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
+  const [announcementMsg, setAnnouncementMsg] = useState('');
   const location = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
 
@@ -55,11 +59,20 @@ export default function DashboardLayout({ children }) {
     const checkMaintenance = async () => {
       try {
         const res = await getPublicSystemStatus();
-        if (res && res.maintenance) {
-          setIsMaintenanceActive(true);
-          setMaintenanceMsg(res.message || 'System is in Maintenance Mode');
-        } else {
-          setIsMaintenanceActive(false);
+        if (res) {
+          if (res.maintenance) {
+            setIsMaintenanceActive(true);
+            setMaintenanceMsg(res.message || 'System is in Maintenance Mode');
+          } else {
+            setIsMaintenanceActive(false);
+          }
+
+          if (res.announcement && res.announcement.active) {
+            setIsAnnouncementActive(true);
+            setAnnouncementMsg(res.announcement.message || '');
+          } else {
+            setIsAnnouncementActive(false);
+          }
         }
       } catch (err) {
         // Silently handle status check
@@ -272,6 +285,42 @@ export default function DashboardLayout({ children }) {
               to="/settings"
               label="Manage Settings"
               color="error"
+              clickable
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
+          </Box>
+        )}
+        {isAnnouncementActive && !isMaintenanceActive && (
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 2,
+              bgcolor: '#fef3c7',
+              border: '1px solid #fde68a',
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'space-between',
+              gap: 2,
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <CampaignIcon color="warning" />
+              <Box>
+                <Typography variant="subtitle2" color="#92400e" fontWeight={700}>
+                  PUBLIC PRE-DEPLOYMENT ANNOUNCEMENT ACTIVE
+                </Typography>
+                <Typography variant="body2" color="#78350f">
+                  {announcementMsg}
+                </Typography>
+              </Box>
+            </Box>
+            <Chip
+              component={Link}
+              to="/settings"
+              label="Edit Notice"
+              color="warning"
               clickable
               size="small"
               sx={{ fontWeight: 700 }}
