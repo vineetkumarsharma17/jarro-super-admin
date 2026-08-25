@@ -135,6 +135,16 @@ export default function RestaurantView() {
     }
   };
 
+  const handleToggleAdFree = async () => {
+    try {
+      const newStatus = !restaurant.isAdFree;
+      await restaurantService.updateRestaurant(id, { isAdFree: newStatus });
+      setRestaurant((prev) => ({ ...prev, isAdFree: newStatus }));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update ad-free status');
+    }
+  };
+
   const breadcrumbItems = [
     { label: 'Restaurants', path: '/restaurants' },
     { label: restaurant?.name || 'Restaurant Details' },
@@ -178,10 +188,10 @@ export default function RestaurantView() {
     );
   }
 
-  if (error) {
+  if (error || !restaurant) {
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography color="error">{error}</Typography>
+        <Alert severity="error">{error || 'Restaurant details unavailable'}</Alert>
       </Box>
     );
   }
@@ -191,17 +201,52 @@ export default function RestaurantView() {
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Restaurant Header */}
-      <Card sx={{ borderRadius: 2, mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main' }}>
-              {restaurant.name?.charAt(0) || 'R'}
-            </Avatar>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>{restaurant.name}</Typography>
-              <Typography color="text.secondary" variant="body1">{restaurant.address}</Typography>
-              <Typography color="text.secondary" variant="body2">Phone: {restaurant.phone || 'N/A'}</Typography>
+      <Card sx={{ borderRadius: 3, mb: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+              <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main', fontSize: 28, fontWeight: 800 }}>
+                {restaurant.name?.charAt(0) || 'R'}
+              </Avatar>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 800 }}>{restaurant.name}</Typography>
+                <Typography color="text.secondary" variant="body1">{restaurant.address || 'Address not configured'}</Typography>
+                <Typography color="text.secondary" variant="body2">Phone: {restaurant.phone || 'N/A'}</Typography>
+              </Box>
             </Box>
+
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Chip
+                label={restaurant.status ? 'ACTIVE STORE' : 'INACTIVE STORE'}
+                color={restaurant.status ? 'success' : 'error'}
+                sx={{ fontWeight: 800 }}
+              />
+
+              <Chip
+                label={restaurant.isAdFree ? 'PRO AD-FREE' : 'FREE AD-SUPPORTED'}
+                color={restaurant.isAdFree ? 'primary' : 'warning'}
+                sx={{ fontWeight: 800 }}
+              />
+
+              <Button
+                size="small"
+                variant="outlined"
+                color={restaurant.isAdFree ? 'warning' : 'primary'}
+                onClick={handleToggleAdFree}
+                sx={{ fontWeight: 700 }}
+              >
+                {restaurant.isAdFree ? 'Enable Ads' : 'Grant Ad-Free Pro'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => navigate('/restaurants')}
+                sx={{ fontWeight: 700 }}
+              >
+                Back to List
+              </Button>
+            </Stack>
           </Box>
         </CardContent>
       </Card>
