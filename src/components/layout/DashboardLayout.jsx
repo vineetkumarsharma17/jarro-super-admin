@@ -146,6 +146,42 @@ export default function DashboardLayout({ children }) {
           </ListItem>
         ))}
       </List>
+
+      {/* 🎯 B2B Google Ads Sidebar Slot Placeholder */}
+      <Box sx={{ px: 1.5, py: 1.5 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.5,
+            borderRadius: 2,
+            bgcolor: '#fef3c7',
+            border: '2px dashed #f59e0b',
+            textAlign: 'center',
+          }}
+        >
+          <Chip
+            size="small"
+            label="AD SLOT"
+            color="warning"
+            sx={{ fontWeight: 800, fontSize: 10, height: 20, mb: 1 }}
+          />
+          <Typography variant="caption" display="block" fontWeight={800} color="#b45309">
+            🎯 Google B2B Ad Slot
+          </Typography>
+          <Typography variant="caption" display="block" color="#92400e" sx={{ fontSize: 10, my: 0.5 }}>
+            Kitchen Supplies & POS Paper Ads
+          </Typography>
+          <Chip
+            size="small"
+            clickable
+            label="✨ Remove Ads (Upgrade)"
+            color="primary"
+            variant="outlined"
+            sx={{ fontWeight: 700, fontSize: 10, mt: 0.5, height: 22 }}
+          />
+        </Paper>
+      </Box>
+
       <Divider />
       <List sx={{ px: 0.5, py: 1 }}>
         <ListItem disablePadding>
