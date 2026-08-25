@@ -11,7 +11,7 @@ import {
   DialogActions,
   Tooltip,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Login as LoginIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
 import { usePresence } from '../../context/PresenceContext';
@@ -117,6 +117,21 @@ export default function RestaurantList() {
     },
   ];
 
+  const handleImpersonate = async (row) => {
+    try {
+      setLoading(true);
+      const res = await restaurantService.impersonateRestaurant(row._id);
+      if (res.token) {
+        const adminUrl = `https://admin.jarro.in/?token=${res.token}`;
+        window.open(adminUrl, '_blank');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to impersonate restaurant');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box>
       <Breadcrumb items={breadcrumbItems} />
@@ -170,6 +185,14 @@ export default function RestaurantList() {
             setSelectedRestaurant(row);
             setConfirmOpen(true);
           },
+          custom: [
+            {
+              label: 'Login as Restaurant',
+              icon: <LoginIcon fontSize="small" />,
+              color: 'primary',
+              onClick: handleImpersonate,
+            },
+          ],
         }}
         emptyMessage="No restaurants found. Click 'Add Restaurant' to create one."
       />
