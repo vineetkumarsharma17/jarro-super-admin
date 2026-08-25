@@ -41,6 +41,8 @@ import {
   Search as SearchIcon,
   FilterList as FilterIcon,
   Timeline as TimelineIcon,
+  SwapVert as NetworkIcon,
+  FormatListNumbered as ProcessIcon,
 } from '@mui/icons-material';
 import { getSystemMonitoring } from '../../services/monitoringService';
 import { restaurantService } from '../../services/restaurantService';
@@ -50,6 +52,10 @@ export default function SystemMonitoring() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(10); // 10 seconds
+
+  // Real-Time WebSocket States (monitor.jarro.in)
+  const [wsConnected, setWsConnected] = useState(false);
+  const [realTimeStats, setRealTimeStats] = useState(null);
 
   // Filter States
   const [presetRange, setPresetRange] = useState('24h');
@@ -62,6 +68,49 @@ export default function SystemMonitoring() {
   // Data States
   const [restaurantsList, setRestaurantsList] = useState([]);
   const [data, setData] = useState(null);
+
+  // Connect to Live Real-Time WebSocket (wss://monitor.jarro.in)
+  useEffect(() => {
+    let socket = null;
+    let reconnectTimer = null;
+
+    const connectWebSocket = () => {
+      try {
+        socket = new WebSocket('wss://monitor.jarro.in');
+
+        socket.onopen = () => {
+          setWsConnected(true);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            setRealTimeStats(payload);
+          } catch (err) {
+            // Silently handle parse errors
+          }
+        };
+
+        socket.onclose = () => {
+          setWsConnected(false);
+          reconnectTimer = setTimeout(connectWebSocket, 5000);
+        };
+
+        socket.onerror = () => {
+          setWsConnected(false);
+        };
+      } catch (err) {
+        setWsConnected(false);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (socket) socket.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, []);
 
   // Load Restaurants List for Filter Dropdown
   useEffect(() => {
@@ -149,12 +198,33 @@ export default function SystemMonitoring() {
   const serverHealth = data?.serverHealth || {};
   const statusDistribution = data?.statusDistribution || [];
   const topRoutes = data?.topRoutes || [];
-  const timeSeries = data?.timeSeries || [];
 
-  const parsePercent = (valStr) => parseFloat(String(valStr || '0').replace('%', ''));
+  // Compute live CPU/RAM stats (prefer real-time WebSocket stream when connected)
+  const cpuPercent = wsConnected && realTimeStats?.cpu
+    ? realTimeStats.cpu.usage
+    : parseFloat(String(serverHealth.cpu?.usagePercent || '0').replace('%', ''));
 
-  const cpuPercent = parsePercent(serverHealth.cpu?.usagePercent);
-  const memPercent = parsePercent(serverHealth.memory?.usagePercent);
+  const memUsedMB = wsConnected && realTimeStats?.ram
+    ? Math.round(realTimeStats.ram.used / (1024 * 1024))
+    : (serverHealth.memory?.usedMB || 0);
+
+  const memTotalMB = wsConnected && realTimeStats?.ram
+    ? Math.round(realTimeStats.ram.total / (1024 * 1024))
+    : (serverHealth.memory?.totalMB || 0);
+
+  const memPercent = wsConnected && realTimeStats?.ram
+    ? realTimeStats.ram.percent
+    : parseFloat(String(serverHealth.memory?.usagePercent || '0').replace('%', ''));
+
+  const memFreeMB = memTotalMB - memUsedMB;
+
+  const diskPercent = realTimeStats?.disk?.percent || 0;
+  const downloadSpeedKbps = realTimeStats?.network?.downloadSpeed
+    ? (realTimeStats.network.downloadSpeed / 1024).toFixed(1)
+    : '0.0';
+  const uploadSpeedKbps = realTimeStats?.network?.uploadSpeed
+    ? (realTimeStats.network.uploadSpeed / 1024).toFixed(1)
+    : '0.0';
 
   const getMethodColor = (method) => {
     switch (method) {
@@ -182,11 +252,33 @@ export default function SystemMonitoring() {
             Backend System & API Monitoring
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Real-time server hardware health, API request volume, and endpoint performance analytics
+            Real-time server hardware health, CPU/RAM WebSocket stream, and API request performance
           </Typography>
         </Box>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
+          <Tooltip title={wsConnected ? 'Connected to wss://monitor.jarro.in live stream (2s interval)' : 'Reconnecting to live WebSocket stream...'}>
+            <Chip
+              size="small"
+              label={wsConnected ? 'Live WS Connected (2s)' : 'WS Connecting...'}
+              color={wsConnected ? 'success' : 'default'}
+              variant="outlined"
+              sx={{ fontWeight: 700 }}
+              icon={
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: wsConnected ? 'success.main' : 'text.disabled',
+                    boxShadow: wsConnected ? '0 0 0 3px rgba(22,163,74,0.2)' : 'none',
+                    ml: 1,
+                  }}
+                />
+              }
+            />
+          </Tooltip>
+
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>Auto Refresh</InputLabel>
             <Select
@@ -408,26 +500,32 @@ export default function SystemMonitoring() {
             </Grid>
           </Grid>
 
-          {/* Hardware & Server Health Panel */}
+          {/* Hardware & Real-Time Server Health Panel */}
           <Grid container spacing={2.5} sx={{ mb: 3 }}>
-            {/* CPU Usage Card */}
+            {/* Real-Time CPU Usage Card */}
             <Grid item xs={12} md={4}>
               <Card sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <MemoryIcon color="primary" />
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      CPU Hardware Usage
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {serverHealth.cpu?.cores || 1} Core(s) • {serverHealth.cpu?.model || 'CPU'}
-                    </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <MemoryIcon color="primary" />
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        CPU Hardware Usage
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {realTimeStats?.cpu?.cores || serverHealth.cpu?.cores || 2} Core(s) • {realTimeStats?.cpu?.model || serverHealth.cpu?.model || 'AMD EPYC'}
+                      </Typography>
+                    </Box>
                   </Box>
+
+                  {wsConnected && (
+                    <Chip size="small" label="LIVE 2s" color="success" sx={{ fontWeight: 800, fontSize: 11 }} />
+                  )}
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">Current Load:</Typography>
-                  <Typography variant="body2" fontWeight={800}>{serverHealth.cpu?.usagePercent || '0%'}</Typography>
+                  <Typography variant="body2" fontWeight={800}>{cpuPercent}%</Typography>
                 </Box>
 
                 <LinearProgress
@@ -446,24 +544,30 @@ export default function SystemMonitoring() {
               </Card>
             </Grid>
 
-            {/* Memory RAM Usage Card */}
+            {/* Real-Time RAM Memory Allocation Card */}
             <Grid item xs={12} md={4}>
               <Card sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <StorageIcon color="secondary" />
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      RAM Memory Allocation
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Used: {serverHealth.memory?.usedMB || 0} MB / {serverHealth.memory?.totalMB || 0} MB Total
-                    </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <StorageIcon color="secondary" />
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        RAM Memory Allocation
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Used: {memUsedMB} MB / {memTotalMB} MB Total
+                      </Typography>
+                    </Box>
                   </Box>
+
+                  {wsConnected && (
+                    <Chip size="small" label="LIVE 2s" color="secondary" sx={{ fontWeight: 800, fontSize: 11 }} />
+                  )}
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">RAM Usage:</Typography>
-                  <Typography variant="body2" fontWeight={800}>{serverHealth.memory?.usagePercent || '0%'}</Typography>
+                  <Typography variant="body2" fontWeight={800}>{memPercent}%</Typography>
                 </Box>
 
                 <LinearProgress
@@ -474,12 +578,12 @@ export default function SystemMonitoring() {
                 />
 
                 <Typography variant="caption" color="text.secondary" display="block">
-                  Free Memory: {serverHealth.memory?.freeMB || 0} MB available
+                  Free Memory: {memFreeMB} MB available
                 </Typography>
               </Card>
             </Grid>
 
-            {/* Database & Runtime Health Card */}
+            {/* Database & System Runtime Card */}
             <Grid item xs={12} md={4}>
               <Card sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
                 <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
@@ -510,20 +614,49 @@ export default function SystemMonitoring() {
                   <Divider />
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">Network Speed (WS):</Typography>
+                    <Typography variant="caption" fontWeight={700} color="primary.main">
+                      ⇓ {downloadSpeedKbps} KB/s • ⇑ {uploadSpeedKbps} KB/s
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="caption" color="text.secondary">Process Uptime:</Typography>
                     <Typography variant="caption" fontWeight={700}>
                       {Math.floor((serverHealth.uptimeSeconds || 0) / 3600)}h {Math.floor(((serverHealth.uptimeSeconds || 0) % 3600) / 60)}m
                     </Typography>
                   </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">Node Runtime:</Typography>
-                    <Typography variant="caption" fontWeight={700}>{serverHealth.nodeVersion || 'v20'}</Typography>
-                  </Box>
                 </Stack>
               </Card>
             </Grid>
           </Grid>
+
+          {/* Real-Time Top OS Processes Panel (When WebSocket stream active) */}
+          {wsConnected && realTimeStats?.processes && realTimeStats.processes.length > 0 && (
+            <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e5e7eb' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <ProcessIcon color="primary" fontSize="small" />
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Live Server Processes (wss://monitor.jarro.in)
+                </Typography>
+              </Box>
+
+              <Grid container spacing={1.5}>
+                {realTimeStats.processes.map((proc, pIdx) => (
+                  <Grid item xs={12} sm={6} md={2.4} key={pIdx}>
+                    <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                      <Typography variant="body2" fontWeight={700} noWrap sx={{ fontFamily: 'monospace', mb: 0.5 }}>
+                        {proc.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        CPU: <strong>{proc.cpu}%</strong> • RAM: <strong>{proc.mem}%</strong>
+                      </Typography>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
 
           {/* Response Status Code Distribution Chips */}
           <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e5e7eb' }}>
