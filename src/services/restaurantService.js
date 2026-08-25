@@ -58,4 +58,9 @@ export const restaurantService = {
         const response = await api.get(`/super/restaurants/${id}/tables`, { params });
         return response.data;
     },
+
+    impersonateRestaurant: async (id) => {
+        const response = await api.post(`/super/impersonate-restaurant/${id}`);
+        return response.data;
+    },
 };
