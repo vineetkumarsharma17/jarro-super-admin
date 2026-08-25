@@ -16,6 +16,7 @@ import RestaurantTables from './pages/Restaurants/RestaurantTables';
 import Settings from './pages/Settings/Settings';
 import UserList from './pages/Users/UserList';
 import Analytics from './pages/Analytics/Analytics';
+import SystemMonitoring from './pages/Monitoring/SystemMonitoring';
 
 const theme = createTheme({
   palette: {
@@ -200,6 +201,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <DashboardLayout>
               <Analytics />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/monitoring"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <SystemMonitoring />
             </DashboardLayout>
           </ProtectedRoute>
         }

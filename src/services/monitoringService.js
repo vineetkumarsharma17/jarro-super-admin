@@ -1,0 +1,10 @@
+import api from './api';
+
+/**
+ * Fetch system and API monitoring metrics (Super Admin)
+ * @param {Object} params { startDate, endDate, restaurantId, statusGroup, routeSearch }
+ */
+export const getSystemMonitoring = async (params = {}) => {
+  const response = await api.get('/super/system-monitoring', { params });
+  return response.data;
+};
