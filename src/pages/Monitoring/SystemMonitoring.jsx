@@ -26,6 +26,11 @@ import {
   CircularProgress,
   Stack,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -43,15 +48,20 @@ import {
   Timeline as TimelineIcon,
   SwapVert as NetworkIcon,
   FormatListNumbered as ProcessIcon,
+  DeleteForever as DeleteIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
-import { getSystemMonitoring } from '../../services/monitoringService';
+import { getSystemMonitoring, clearApiLogs } from '../../services/monitoringService';
 import { restaurantService } from '../../services/restaurantService';
 
 export default function SystemMonitoring() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [clearingLogs, setClearingLogs] = useState(false);
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(10); // 10 seconds
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   // Real-Time WebSocket States (monitor.jarro.in)
   const [wsConnected, setWsConnected] = useState(false);
@@ -63,6 +73,7 @@ export default function SystemMonitoring() {
   const [endDate, setEndDate] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState('all');
   const [statusGroup, setStatusGroup] = useState('all');
+  const [selectedStatusCode, setSelectedStatusCode] = useState('all');
   const [routeSearch, setRouteSearch] = useState('');
 
   // Data States
@@ -167,6 +178,7 @@ export default function SystemMonitoring() {
         endDate: dates.endDate,
         restaurantId: selectedRestaurant,
         statusGroup: statusGroup,
+        statusCode: selectedStatusCode,
         routeSearch: routeSearch,
       };
 
@@ -179,7 +191,7 @@ export default function SystemMonitoring() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [getComputedDates, selectedRestaurant, statusGroup, routeSearch]);
+  }, [getComputedDates, selectedRestaurant, statusGroup, selectedStatusCode, routeSearch]);
 
   useEffect(() => {
     fetchData();
@@ -193,6 +205,48 @@ export default function SystemMonitoring() {
     }, autoRefreshInterval * 1000);
     return () => clearInterval(interval);
   }, [autoRefreshInterval, fetchData]);
+
+  // Reset API Logs Handler
+  const handleResetLogsConfirm = async () => {
+    setResetDialogOpen(false);
+    setClearingLogs(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await clearApiLogs();
+      setSuccessMsg(res.message || 'API metrics logs successfully reset.');
+      await fetchData(true);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reset API metrics logs.');
+    } finally {
+      setClearingLogs(false);
+    }
+  };
+
+  // Quick Card Click Filter Handlers
+  const handleSelectAllFilter = () => {
+    setStatusGroup('all');
+    setSelectedStatusCode('all');
+  };
+
+  const handleSelectSuccessFilter = () => {
+    setStatusGroup('success');
+    setSelectedStatusCode('all');
+  };
+
+  const handleSelectFailedFilter = () => {
+    setStatusGroup('failed');
+    setSelectedStatusCode('all');
+  };
+
+  const handleSelectStatusCode = (code) => {
+    if (String(selectedStatusCode) === String(code)) {
+      setSelectedStatusCode('all'); // Toggle off
+    } else {
+      setSelectedStatusCode(String(code));
+    }
+  };
 
   const summary = data?.summary || {};
   const serverHealth = data?.serverHealth || {};
@@ -218,7 +272,6 @@ export default function SystemMonitoring() {
 
   const memFreeMB = memTotalMB - memUsedMB;
 
-  const diskPercent = realTimeStats?.disk?.percent || 0;
   const downloadSpeedKbps = realTimeStats?.network?.downloadSpeed
     ? (realTimeStats.network.downloadSpeed / 1024).toFixed(1)
     : '0.0';
@@ -242,6 +295,8 @@ export default function SystemMonitoring() {
     return '#dc2626'; // Red
   };
 
+  const hasActiveFilter = statusGroup !== 'all' || selectedStatusCode !== 'all' || routeSearch.trim() !== '' || selectedRestaurant !== 'all';
+
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Header Bar */}
@@ -256,7 +311,7 @@ export default function SystemMonitoring() {
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Tooltip title={wsConnected ? 'Connected to wss://monitor.jarro.in live stream (2s interval)' : 'Reconnecting to live WebSocket stream...'}>
             <Chip
               size="small"
@@ -279,7 +334,7 @@ export default function SystemMonitoring() {
             />
           </Tooltip>
 
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel>Auto Refresh</InputLabel>
             <Select
               value={autoRefreshInterval}
@@ -300,18 +355,59 @@ export default function SystemMonitoring() {
             disabled={refreshing}
             sx={{ fontWeight: 700 }}
           >
-            Refresh Now
+            Refresh
+          </Button>
+
+          {/* Reset API Logs Button */}
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={clearingLogs ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
+            onClick={() => setResetDialogOpen(true)}
+            disabled={clearingLogs}
+            sx={{ fontWeight: 700 }}
+          >
+            Reset API Logs
           </Button>
         </Stack>
       </Box>
 
       {/* Filter Control Bar */}
       <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e5e7eb' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <FilterIcon fontSize="small" color="primary" />
-          <Typography variant="subtitle2" fontWeight={700}>
-            Filter Monitoring Metrics
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FilterIcon fontSize="small" color="primary" />
+            <Typography variant="subtitle2" fontWeight={700}>
+              Filter Monitoring Metrics & API List
+            </Typography>
+
+            {hasActiveFilter && (
+              <Chip
+                size="small"
+                label="Filter Active"
+                color="primary"
+                sx={{ fontWeight: 700, fontSize: 11 }}
+              />
+            )}
+          </Box>
+
+          {hasActiveFilter && (
+            <Button
+              size="small"
+              color="secondary"
+              startIcon={<ClearIcon fontSize="small" />}
+              onClick={() => {
+                setStatusGroup('all');
+                setSelectedStatusCode('all');
+                setRouteSearch('');
+                setSelectedRestaurant('all');
+                setPresetRange('24h');
+              }}
+              sx={{ fontWeight: 700 }}
+            >
+              Clear All Filters
+            </Button>
+          )}
         </Box>
 
         <Grid container spacing={2} alignItems="center">
@@ -383,14 +479,18 @@ export default function SystemMonitoring() {
           {/* Status Code Filter */}
           <Grid item xs={12} sm={6} md={2.5}>
             <FormControl fullWidth size="small">
-              <InputLabel>Status Code</InputLabel>
+              <InputLabel>Status Group</InputLabel>
               <Select
                 value={statusGroup}
-                label="Status Code"
-                onChange={(e) => setStatusGroup(e.target.value)}
+                label="Status Group"
+                onChange={(e) => {
+                  setStatusGroup(e.target.value);
+                  setSelectedStatusCode('all');
+                }}
               >
                 <MenuItem value="all">All Responses</MenuItem>
                 <MenuItem value="success">2xx / 3xx Success</MenuItem>
+                <MenuItem value="failed">All Errors (4xx & 5xx)</MenuItem>
                 <MenuItem value="client_error">4xx Client Errors</MenuItem>
                 <MenuItem value="server_error">5xx Server Errors</MenuItem>
               </Select>
@@ -402,7 +502,7 @@ export default function SystemMonitoring() {
             <TextField
               fullWidth
               size="small"
-              placeholder="Search route path..."
+              placeholder="Search route..."
               value={routeSearch}
               onChange={(e) => setRouteSearch(e.target.value)}
               InputProps={{
@@ -414,8 +514,14 @@ export default function SystemMonitoring() {
       </Paper>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {successMsg && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMsg(null)}>
+          {successMsg}
         </Alert>
       )}
 
@@ -425,13 +531,24 @@ export default function SystemMonitoring() {
         </Box>
       ) : (
         <>
-          {/* Top 4 KPI Stat Cards */}
+          {/* Top 4 Interactive Clickable KPI Stat Cards */}
           <Grid container spacing={2.5} sx={{ mb: 3 }}>
-            {/* 1. Total Requests */}
+            {/* 1. Total Requests (Clickable) */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ p: 2, borderRadius: 3 }}>
+              <Card
+                onClick={handleSelectAllFilter}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusGroup === 'all' && selectedStatusCode === 'all' ? '2px solid #4f46e5' : '1px solid #e5e7eb',
+                  boxShadow: statusGroup === 'all' && selectedStatusCode === 'all' ? '0 0 0 4px rgba(79, 70, 229, 0.15)' : 'none',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
+                }}
+              >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="overline" color="text.secondary">
+                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
                     Total API Requests
                   </Typography>
                   <DnsIcon color="primary" />
@@ -442,15 +559,29 @@ export default function SystemMonitoring() {
                 <Typography variant="caption" color="text.secondary">
                   {summary.successRequests?.toLocaleString() || 0} Success • {summary.failedRequests?.toLocaleString() || 0} Failed
                 </Typography>
+                <Typography variant="caption" display="block" color="primary.main" fontWeight={700} sx={{ mt: 0.5 }}>
+                  👉 Click to show All Requests
+                </Typography>
               </Card>
             </Grid>
 
-            {/* 2. Success Rate % */}
+            {/* 2. Success Rate / Passed (Clickable) */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ p: 2, borderRadius: 3 }}>
+              <Card
+                onClick={handleSelectSuccessFilter}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusGroup === 'success' ? '2px solid #16a34a' : '1px solid #e5e7eb',
+                  boxShadow: statusGroup === 'success' ? '0 0 0 4px rgba(22, 163, 74, 0.15)' : 'none',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
+                }}
+              >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="overline" color="text.secondary">
-                    Success Rate
+                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                    Success Rate (Passed)
                   </Typography>
                   <CheckCircleIcon color="success" />
                 </Box>
@@ -460,23 +591,40 @@ export default function SystemMonitoring() {
                 <Typography variant="caption" color="text.secondary">
                   Target: &gt;99.5% operational uptime
                 </Typography>
+                <Typography variant="caption" display="block" color="success.main" fontWeight={700} sx={{ mt: 0.5 }}>
+                  👉 Click to filter Passed (2xx/3xx)
+                </Typography>
               </Card>
             </Grid>
 
-            {/* 3. Average Response Time */}
+            {/* 3. Failed Requests (Clickable) */}
             <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ p: 2, borderRadius: 3 }}>
+              <Card
+                onClick={handleSelectFailedFilter}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusGroup === 'failed' ? '2px solid #dc2626' : '1px solid #e5e7eb',
+                  boxShadow: statusGroup === 'failed' ? '0 0 0 4px rgba(220, 38, 38, 0.15)' : 'none',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
+                }}
+              >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="overline" color="text.secondary">
-                    Avg Response Time
+                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                    Failed Requests (Errors)
                   </Typography>
-                  <SpeedIcon sx={{ color: getLatencyColor(summary.avgResponseTimeMs || 0) }} />
+                  <ErrorIcon color="error" />
                 </Box>
-                <Typography variant="h4" fontWeight={800} sx={{ color: getLatencyColor(summary.avgResponseTimeMs || 0) }}>
-                  {summary.avgResponseTimeMs || 0} <Typography component="span" variant="h6">ms</Typography>
+                <Typography variant="h4" fontWeight={800} color={summary.failedRequests > 0 ? 'error.main' : 'text.primary'}>
+                  {summary.failedRequests?.toLocaleString() || 0}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Min: {summary.minResponseTimeMs || 0}ms • Max: {summary.maxResponseTimeMs || 0}ms
+                  Avg Latency: {summary.avgResponseTimeMs || 0}ms
+                </Typography>
+                <Typography variant="caption" display="block" color="error.main" fontWeight={700} sx={{ mt: 0.5 }}>
+                  👉 Click to filter Failed Requests
                 </Typography>
               </Card>
             </Grid>
@@ -485,7 +633,7 @@ export default function SystemMonitoring() {
             <Grid item xs={12} sm={6} md={3}>
               <Card sx={{ p: 2, borderRadius: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="overline" color="text.secondary">
+                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
                     Active Ecosystem
                   </Typography>
                   <RestaurantIcon color="info" />
@@ -631,38 +779,23 @@ export default function SystemMonitoring() {
             </Grid>
           </Grid>
 
-          {/* Real-Time Top OS Processes Panel (When WebSocket stream active) */}
-          {wsConnected && realTimeStats?.processes && realTimeStats.processes.length > 0 && (
-            <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e5e7eb' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <ProcessIcon color="primary" fontSize="small" />
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Live Server Processes (wss://monitor.jarro.in)
-                </Typography>
-              </Box>
-
-              <Grid container spacing={1.5}>
-                {realTimeStats.processes.map((proc, pIdx) => (
-                  <Grid item xs={12} sm={6} md={2.4} key={pIdx}>
-                    <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                      <Typography variant="body2" fontWeight={700} noWrap sx={{ fontFamily: 'monospace', mb: 0.5 }}>
-                        {proc.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        CPU: <strong>{proc.cpu}%</strong> • RAM: <strong>{proc.mem}%</strong>
-                      </Typography>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Paper>
-          )}
-
-          {/* Response Status Code Distribution Chips */}
+          {/* Interactive Clickable Response Status Code Distribution Chips */}
           <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e5e7eb' }}>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-              Response Status Code Distribution
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                Interactive Response Status Code Distribution (Click any code to filter table below)
+              </Typography>
+
+              {selectedStatusCode !== 'all' && (
+                <Chip
+                  size="small"
+                  label={`Filtered by HTTP ${selectedStatusCode} (Click to clear)`}
+                  color="primary"
+                  onDelete={() => setSelectedStatusCode('all')}
+                  sx={{ fontWeight: 700 }}
+                />
+              )}
+            </Box>
 
             <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
               {statusDistribution.length === 0 ? (
@@ -670,15 +803,26 @@ export default function SystemMonitoring() {
               ) : (
                 statusDistribution.map((item) => {
                   const code = item.statusCode;
+                  const isSelected = String(selectedStatusCode) === String(code);
                   const isSuccess = code >= 200 && code < 400;
                   const isClientError = code >= 400 && code < 500;
+
                   return (
                     <Chip
                       key={code}
+                      clickable
+                      onClick={() => handleSelectStatusCode(code)}
                       label={`HTTP ${code}: ${item.count.toLocaleString()} calls`}
                       color={isSuccess ? 'success' : isClientError ? 'warning' : 'error'}
-                      variant="outlined"
-                      sx={{ fontWeight: 700, fontSize: 13 }}
+                      variant={isSelected ? 'filled' : 'outlined'}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 13,
+                        transition: 'all 0.2s ease-in-out',
+                        border: isSelected ? '2px solid' : '1px solid',
+                        boxShadow: isSelected ? '0 0 0 3px rgba(0,0,0,0.15)' : 'none',
+                        '&:hover': { transform: 'scale(1.05)' },
+                      }}
                     />
                   );
                 })
@@ -688,13 +832,25 @@ export default function SystemMonitoring() {
 
           {/* Top API Endpoints Performance Table */}
           <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid #e5e7eb' }}>
-              <Typography variant="h6" fontWeight={800}>
-                API Route Performance & Endpoint Health
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Top endpoints ranked by total call volume and response latency
-              </Typography>
+            <Box sx={{ p: 2.5, borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={800}>
+                  API Route Performance & Endpoint Health
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Top endpoints ranked by total call volume and response latency
+                </Typography>
+              </Box>
+
+              {hasActiveFilter && (
+                <Chip
+                  label={`Showing Filtered Results (${topRoutes.length} routes)`}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  sx={{ fontWeight: 700 }}
+                />
+              )}
             </Box>
 
             <Table sx={{ minWidth: 650 }}>
@@ -713,7 +869,7 @@ export default function SystemMonitoring() {
                 {topRoutes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">No API request logs recorded in this filter criteria.</Typography>
+                      <Typography color="text.secondary">No API request logs match your filter criteria.</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -768,6 +924,27 @@ export default function SystemMonitoring() {
           </TableContainer>
         </>
       )}
+
+      {/* Confirmation Dialog for Resetting API Logs */}
+      <Dialog open={resetDialogOpen} onClose={() => setResetDialogOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningIcon color="error" />
+          Reset All API Request Logs?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete all historical API metrics logs from MongoDB? This will reset all request counters, HTTP status code counts, and latency averages back to 0. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetDialogOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>
+            Cancel
+          </Button>
+          <Button onClick={handleResetLogsConfirm} color="error" variant="contained" sx={{ fontWeight: 700 }}>
+            Yes, Reset API Logs
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
