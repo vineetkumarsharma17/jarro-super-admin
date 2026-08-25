@@ -1,42 +1,54 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Box, 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Avatar, 
-  Divider, 
-  List, 
-  ListItem, 
-  ListItemText, 
+import {
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Avatar,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
   CircularProgress,
   CardActionArea,
   Paper,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
+  IconButton,
+  Tooltip,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Stack,
 } from '@mui/material';
-import { 
+import {
   Restaurant as MenuIcon,
   Category as CategoryIcon,
   TableBar as TableIcon,
   ArrowForward as ArrowForwardIcon,
   CardMembership as SubscriptionIcon,
   AccountBalanceWallet as WalletIcon,
+  ShoppingCart as OrderIcon,
+  AttachMoney as MoneyIcon,
+  Speed as SpeedIcon,
+  TrendingUp as TrendingUpIcon,
+  Schedule as ScheduleIcon,
 } from '@mui/icons-material';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { useParams, useNavigate } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
 import { subscriptionService } from '../../services/subscriptionService';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import { 
-  Button, 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  TextField, 
-  Alert,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
 
 export default function RestaurantView() {
   const { id } = useParams();
@@ -178,51 +190,231 @@ export default function RestaurantView() {
     );
   }
 
-  if (error) {
+  if (error || !restaurant) {
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography color="error">{error}</Typography>
+        <Alert severity="error">{error || 'Restaurant details unavailable'}</Alert>
       </Box>
     );
   }
+
+  const hourlyPeakData = stats?.hourlyPeakHours || [];
+  const topItemsData = stats?.topSellingItems || [];
 
   return (
     <Box sx={{ py: 3 }}>
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Restaurant Header */}
-      <Card sx={{ borderRadius: 2, mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main' }}>
-              {restaurant.name?.charAt(0) || 'R'}
-            </Avatar>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>{restaurant.name}</Typography>
-              <Typography color="text.secondary" variant="body1">{restaurant.address}</Typography>
-              <Typography color="text.secondary" variant="body2">Phone: {restaurant.phone || 'N/A'}</Typography>
+      <Card sx={{ borderRadius: 3, mb: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+              <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main', fontSize: 28, fontWeight: 800 }}>
+                {restaurant.name?.charAt(0) || 'R'}
+              </Avatar>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 800 }}>{restaurant.name}</Typography>
+                <Typography color="text.secondary" variant="body1">{restaurant.address || 'Address not configured'}</Typography>
+                <Typography color="text.secondary" variant="body2">Phone: {restaurant.phone || 'N/A'}</Typography>
+              </Box>
             </Box>
+
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Chip
+                label={restaurant.status ? 'ACTIVE STORE' : 'INACTIVE STORE'}
+                color={restaurant.status ? 'success' : 'error'}
+                sx={{ fontWeight: 800 }}
+              />
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => navigate('/restaurants')}
+                sx={{ fontWeight: 700 }}
+              >
+                Back to List
+              </Button>
+            </Stack>
           </Box>
         </CardContent>
       </Card>
 
-      <Grid container spacing={3}>
-        {/* Navigation Cards */}
+      {/* Detailed Restaurant Business Analytics & Performance Metrics */}
+      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <TrendingUpIcon color="primary" />
+        Detailed Store Business Analytics (Last 30 Days)
+      </Typography>
+
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
+        {/* Total Orders & Daily Average Orders */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                Total Store Orders
+              </Typography>
+              <OrderIcon color="primary" />
+            </Box>
+            <Typography variant="h4" fontWeight={800}>
+              {stats?.totalOrders?.toLocaleString() || 0}
+            </Typography>
+            <Typography variant="caption" color="primary.main" fontWeight={700}>
+              ⚡ {stats?.dailyAverageOrders || 0} Average Orders / Day
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Store Gross Revenue & AOV */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                Gross Store Revenue
+              </Typography>
+              <MoneyIcon color="success" />
+            </Box>
+            <Typography variant="h4" fontWeight={800} color="success.main">
+              ₹{stats?.totalRevenue?.toLocaleString() || 0}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Avg Order Value: ₹{stats?.avgOrderValue || 0}
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Tables & Menu Scale */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                Tables & Menu Scale
+              </Typography>
+              <TableIcon color="warning" />
+            </Box>
+            <Typography variant="h4" fontWeight={800}>
+              {stats?.tables || 0} <Typography component="span" variant="body1" color="text.secondary">Tables</Typography>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {stats?.menus || 0} Menu Items • {stats?.categories || 0} Categories
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Registered Staff Accounts */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                Registered Staff Accounts
+              </Typography>
+              <SpeedIcon color="info" />
+            </Box>
+            <Typography variant="h4" fontWeight={800}>
+              {stats?.users || 0} <Typography component="span" variant="body1" color="text.secondary">Staff</Typography>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Active POS & Billing Operators
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Hourly Rush Hours & Top Selling Items */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {/* Hourly Peak Rush Hours Chart */}
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none', height: '100%' }}>
+            <Typography variant="h6" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ScheduleIcon color="primary" />
+              Hourly Peak Rush Hours (Order Velocity)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+              Identify store rush hours (e.g. 1pm–3pm Lunch Rush, 8pm–10pm Dinner Rush)
+            </Typography>
+
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={hourlyPeakData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RechartsTooltip />
+                <Bar dataKey="orders" fill="#16a34a" radius={[4, 4, 0, 0]} name="Orders" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        {/* Top Selling Menu Items Table */}
+        <Grid item xs={12} md={5}>
+          <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none', height: '100%' }}>
+            <Box sx={{ p: 2.5, borderBottom: '1px solid #e5e7eb' }}>
+              <Typography variant="h6" fontWeight={800}>
+                Top Selling Menu Items
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Most ordered food items in this store
+              </Typography>
+            </Box>
+
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Item Name</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Qty Sold</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Revenue</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {topItemsData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                      <Typography variant="caption" color="text.secondary">No item sales recorded yet.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  topItemsData.map((item, idx) => (
+                    <TableRow key={idx} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={700}>
+                          {item.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Chip label={`${item.quantity} pcs`} size="small" color="primary" sx={{ fontWeight: 700 }} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight={700} color="success.main">
+                          ₹{item.revenue}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Grid>
+      </Grid>
+
+      {/* Quick Navigation Cards */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12}>
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-            Quick Navigation
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
+            Quick Navigation & Catalog Management
           </Typography>
           <Grid container spacing={3}>
             {navigationCards.map((card, index) => (
               <Grid item xs={12} sm={6} md={4} key={index}>
                 <Card 
                   sx={{ 
-                    borderRadius: 2,
+                    borderRadius: 3,
                     height: '100%',
-                    transition: 'all 0.3s',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: 'none',
+                    transition: 'all 0.2s',
                     '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 4,
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                     },
                   }}
                 >
@@ -254,7 +446,7 @@ export default function RestaurantView() {
                         </Box>
                         <ArrowForwardIcon sx={{ color: 'text.secondary' }} />
                       </Box>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
                         {card.title}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -265,13 +457,13 @@ export default function RestaurantView() {
                         sx={{ 
                           bgcolor: card.bgColor, 
                           p: 1.5, 
-                          borderRadius: 1,
+                          borderRadius: 2,
                           textAlign: 'center',
                         }}
                       >
                         <Typography 
                           variant="h4" 
-                          sx={{ fontWeight: 700, color: card.color }}
+                          sx={{ fontWeight: 800, color: card.color }}
                         >
                           {card.count}
                         </Typography>
@@ -287,333 +479,75 @@ export default function RestaurantView() {
           </Grid>
         </Grid>
 
-        {/* Restaurant Details & Subscription */}
+        {/* Restaurant Owner Details & Subscription Control */}
         <Grid item xs={12} md={8}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Card sx={{ borderRadius: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Restaurant Information
+          <Card sx={{ borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none', mb: 3 }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Store Owner Information
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="caption" color="text.secondary">Owner Username</Typography>
+                  <Typography variant="body1" fontWeight={700}>{restaurant.ownerId?.username || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" color="text.secondary">Owner Email</Typography>
+                  <Typography variant="body1" fontWeight={700}>{restaurant.ownerId?.email || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" color="text.secondary">Owner Mobile</Typography>
+                  <Typography variant="body1" fontWeight={700}>{restaurant.ownerId?.mobile || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" color="text.secondary">Account Created</Typography>
+                  <Typography variant="body1" fontWeight={700}>
+                    {new Date(restaurant.createdAt).toLocaleDateString()}
                   </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Status
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.status ? 'Active' : 'Inactive'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Users
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {stats?.users ?? 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Latitude
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.latitude ?? 'N/A'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Longitude
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.longitude ?? 'N/A'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                    Description
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {restaurant.description || 'No description provided.'}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Subscription Card */}
-            <Grid item xs={12}>
-              <Card sx={{ borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Subscription Details
-                    </Typography>
-                    {!subscription ? (
-                      <Button 
-                        variant="contained" 
-                        size="small"
-                        onClick={() => setOpenModal(true)}
-                        startIcon={<SubscriptionIcon />}
-                      >
-                        Assign Subscription
-                      </Button>
-                    ) : (
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button 
-                          variant="outlined" 
-                          size="small"
-                          color="primary"
-                          onClick={() => {
-                            setNewExpiryDate(subscription.endDate ? new Date(subscription.endDate).toISOString().split('T')[0] : '');
-                            setOpenExpiryModal(true);
-                          }}
-                        >
-                          Edit Expiry
-                        </Button>
-                        <Button 
-                          variant="outlined" 
-                          size="small"
-                          color="error"
-                          onClick={handleRemoveSubscription}
-                          disabled={removing}
-                        >
-                          {removing ? 'Removing...' : 'Remove'}
-                        </Button>
-                      </Box>
-                    )}
-                  </Box>
-
-                  {subscription ? (
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <SubscriptionIcon color="primary" />
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Plan Type</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>{subscription.type}</Typography>
-                          </Box>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Box 
-                            sx={{ 
-                              width: 10, 
-                              height: 10, 
-                              borderRadius: '50%', 
-                              bgcolor: subscription.status === 'ACTIVE' ? 'success.main' : 'error.main' 
-                            }} 
-                          />
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Status</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>{subscription.status}</Typography>
-                          </Box>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">Start Date</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {new Date(subscription.startDate).toLocaleDateString()}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">Expiration Date</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {subscription.endDate ? new Date(subscription.endDate).toLocaleDateString() : 'N/A'}
-                        </Typography>
-                      </Grid>
-
-                      {subscription.type === 'PAYG' && (
-                        <Grid item xs={12}>
-                          <Divider sx={{ my: 1 }} />
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <WalletIcon color="warning" />
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">Current Balance</Typography>
-                              <Typography variant="h6" sx={{ fontWeight: 700, color: 'warning.main' }}>
-                                ₹{balance}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                      )}
-                    </Grid>
-                  ) : (
-                    <Box sx={{ py: 2, textAlign: 'center' }}>
-                      <Alert severity="warning" sx={{ mb: 0 }}>
-                        No active subscription assigned to this restaurant owner.
-                      </Alert>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
         </Grid>
 
-        {/* Owner Details */}
+        {/* Subscription & Payg Balance */}
         <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 2 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                Owner Information
-              </Typography>
-              <List disablePadding>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemText 
-                    primary={
-                      <Typography variant="body2" color="text.secondary">
-                        Name
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.ownerId?.username || 'N/A'}
-                      </Typography>
-                    } 
-                  />
-                </ListItem>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemText 
-                    primary={
-                      <Typography variant="body2" color="text.secondary">
-                        Email
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.ownerId?.email || 'N/A'}
-                      </Typography>
-                    } 
-                  />
-                </ListItem>
-                <ListItem disablePadding>
-                  <ListItemText 
-                    primary={
-                      <Typography variant="body2" color="text.secondary">
-                        Mobile
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {restaurant.ownerId?.mobile || 'N/A'}
-                      </Typography>
-                    } 
-                  />
-                </ListItem>
-              </List>
+          <Card sx={{ borderRadius: 3, border: '1px solid #e5e7eb', boxShadow: 'none', mb: 3 }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <SubscriptionIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Subscription Status
+                </Typography>
+              </Box>
+
+              {subscription ? (
+                <Box>
+                  <Chip label={subscription.status} color="success" sx={{ fontWeight: 800, mb: 2 }} />
+                  <Typography variant="body2" color="text.secondary">Plan: {subscription.planName || 'Standard'}</Typography>
+                  <Typography variant="body2" color="text.secondary">Expires: {new Date(subscription.endDate).toLocaleDateString()}</Typography>
+
+                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                    <Button size="small" variant="outlined" onClick={() => setOpenExpiryModal(true)}>
+                      Extend Expiry
+                    </Button>
+                    <Button size="small" variant="outlined" color="error" onClick={handleRemoveSubscription} disabled={removing}>
+                      Remove Plan
+                    </Button>
+                  </Stack>
+                </Box>
+              ) : (
+                <Box>
+                  <Alert severity="warning" sx={{ mb: 2 }}>No active subscription plan</Alert>
+                  <Button variant="contained" fullWidth onClick={() => setOpenModal(true)} sx={{ fontWeight: 700 }}>
+                    Assign Subscription
+                  </Button>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
       </Grid>
-
-      {/* Assign Subscription Modal */}
-      <Dialog open={openModal} onClose={() => !assigning && setOpenModal(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Assign Subscription</DialogTitle>
-        <DialogContent dividers>
-          {modalError && <Alert severity="error" sx={{ mb: 2 }}>{modalError}</Alert>}
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Assign a YEARLY subscription plan to <strong>{restaurant.ownerId?.username || 'the owner'}</strong>.
-          </Typography>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                select
-                fullWidth
-                label="Subscription Type"
-                value={assignData.type}
-                disabled // Locked to YEARLY for now as per user feedback
-                SelectProps={{ native: true }}
-              >
-                <option value="YEARLY">Yearly Subscription (₹2999)</option>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Amount (INR)"
-                type="number"
-                value={assignData.amount}
-                onChange={(e) => setAssignData({ ...assignData, amount: e.target.value })}
-                inputProps={{ min: 0 }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                select
-                fullWidth
-                label="Payment Method"
-                value={assignData.paymentMethod}
-                onChange={(e) => setAssignData({ ...assignData, paymentMethod: e.target.value })}
-                SelectProps={{ native: true }}
-              >
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="upi">UPI</option>
-                <option value="other">Other</option>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Transaction ID / Reference"
-                value={assignData.transactionId}
-                onChange={(e) => setAssignData({ ...assignData, transactionId: e.target.value })}
-                placeholder="Optional"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenModal(false)} disabled={assigning}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={handleAssignSubscription} 
-            disabled={assigning}
-            startIcon={assigning && <CircularProgress size={20} color="inherit" />}
-          >
-            {assigning ? 'Assigning...' : 'Assign Subscription'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Update Expiry Modal */}
-      <Dialog open={openExpiryModal} onClose={() => !updatingExpiry && setOpenExpiryModal(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Update Expiry Date</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Change the expiration date for the current <strong>{subscription?.type}</strong> subscription.
-          </Typography>
-          
-          <TextField
-            fullWidth
-            label="New Expiration Date"
-            type="date"
-            value={newExpiryDate}
-            onChange={(e) => setNewExpiryDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenExpiryModal(false)} disabled={updatingExpiry}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={handleUpdateExpiry} 
-            disabled={updatingExpiry}
-            startIcon={updatingExpiry && <CircularProgress size={20} color="inherit" />}
-          >
-            {updatingExpiry ? 'Updating...' : 'Update Expiry'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
