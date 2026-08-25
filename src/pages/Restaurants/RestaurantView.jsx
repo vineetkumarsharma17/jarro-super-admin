@@ -571,10 +571,24 @@ export default function RestaurantView() {
                 fullWidth
                 label="Subscription Type"
                 value={assignData.type}
-                disabled // Locked to YEARLY for now as per user feedback
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAssignData({ ...assignData, type: val });
+                  // Sync isAdFree flag based on selected plan type
+                  if (val === 'PREMIUM_AD_FREE') {
+                    restaurantService.updateRestaurant(id, { isAdFree: true });
+                    setRestaurant((prev) => ({ ...prev, isAdFree: true }));
+                  } else if (val === 'TRIAL_AD_SUPPORTED') {
+                    restaurantService.updateRestaurant(id, { isAdFree: false });
+                    setRestaurant((prev) => ({ ...prev, isAdFree: false }));
+                  }
+                }}
                 SelectProps={{ native: true }}
               >
-                <option value="YEARLY">Yearly Subscription (₹2999)</option>
+                <option value="TRIAL_AD_SUPPORTED">Free Trial (Ad-Supported)</option>
+                <option value="PREMIUM_AD_FREE">Premium Pro (Ad-Free)</option>
+                <option value="YEARLY">Yearly Subscription</option>
+                <option value="PAYG">Pay As You Go</option>
               </TextField>
             </Grid>
             <Grid item xs={12}>
