@@ -16,6 +16,9 @@ import {
   Avatar,
   Tooltip,
   Chip,
+  FormControl,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { usePresence } from '../../context/PresenceContext';
 import {
@@ -33,6 +36,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 import { getPublicSystemStatus } from '../../services/systemService';
+import { ENV_CONFIG, getActiveEnvKey, setActiveEnvKey } from '../../services/api';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 const drawerWidth = 248;
@@ -204,6 +208,35 @@ export default function DashboardLayout({ children }) {
                 }
               />
             </Tooltip>
+
+            {/* PROD / DEV Environment Switcher Selector */}
+            <FormControl size="small">
+              <Select
+                value={getActiveEnvKey()}
+                onChange={(e) => setActiveEnvKey(e.target.value)}
+                size="small"
+                sx={{
+                  height: 32,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  bgcolor: getActiveEnvKey() === 'prod' ? '#fee2e2' : '#fef3c7',
+                  color: getActiveEnvKey() === 'prod' ? '#dc2626' : '#d97706',
+                  borderRadius: 2,
+                  '& .MuiSelect-select': { py: 0.5, px: 1.5, display: 'flex', alignItems: 'center' },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: getActiveEnvKey() === 'prod' ? '#fca5a5' : '#fde68a',
+                  },
+                }}
+              >
+                <MenuItem value="prod" sx={{ fontWeight: 700, fontSize: 13, color: '#dc2626' }}>
+                  🔴 PROD (api.jarro.in)
+                </MenuItem>
+                <MenuItem value="dev" sx={{ fontWeight: 700, fontSize: 13, color: '#d97706' }}>
+                  🟡 DEV (dev-api.jarro.in)
+                </MenuItem>
+              </Select>
+            </FormControl>
+
             <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
               <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
                 {displayName}
