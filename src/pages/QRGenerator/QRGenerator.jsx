@@ -89,6 +89,13 @@ export default function QRGenerator() {
   const [validationResult, setValidationResult] = useState(null);
   const [validatorError, setValidatorError] = useState('');
 
+  // Paper & Sheet Layout State
+  const [paperFormat, setPaperFormat] = useState('a4-12');
+  const [customWidthMm, setCustomWidthMm] = useState(210);
+  const [customHeightMm, setCustomHeightMm] = useState(297);
+  const [customCols, setCustomCols] = useState(3);
+  const [customRows, setCustomRows] = useState(4);
+
   // Set default active environment based on current environment key
   useEffect(() => {
     const currentKey = getActiveEnvKey();
@@ -147,32 +154,66 @@ export default function QRGenerator() {
     handleGenerateBatch();
   }, [activeEnv]);
 
-  // Export PDF Sheet (100 QR stickers grid)
+  // Export PDF Sheet (Multi-layout QR stickers grid)
   const handleExportPDF = async () => {
     if (qrItems.length === 0) return;
     try {
       setExporting(true);
       setExportProgress(0);
 
+      let pdfFormat = 'a4';
+      let orientation = 'portrait';
+      let cols = 3;
+      let rows = 4;
+
+      if (paperFormat === 'a4-12') {
+        pdfFormat = 'a4';
+        orientation = 'portrait';
+        cols = 3;
+        rows = 4;
+      } else if (paperFormat === 'a4-20') {
+        pdfFormat = 'a4';
+        orientation = 'portrait';
+        cols = 4;
+        rows = 5;
+      } else if (paperFormat === '20x12-inch') {
+        pdfFormat = [508, 304.8]; // 20" x 12" in mm
+        orientation = 'landscape';
+        cols = 8;
+        rows = 4;
+      } else if (paperFormat === '20x12-cm') {
+        pdfFormat = [200, 120]; // 20cm x 12cm in mm
+        orientation = 'landscape';
+        cols = 3;
+        rows = 2;
+      } else if (paperFormat === 'a3-24') {
+        pdfFormat = 'a3';
+        orientation = 'portrait';
+        cols = 4;
+        rows = 6;
+      } else if (paperFormat === 'custom') {
+        const w = parseFloat(customWidthMm) || 210;
+        const h = parseFloat(customHeightMm) || 297;
+        pdfFormat = [w, h];
+        orientation = w >= h ? 'landscape' : 'portrait';
+        cols = Math.max(parseInt(customCols) || 1, 1);
+        rows = Math.max(parseInt(customRows) || 1, 1);
+      }
+
       const doc = new jsPDF({
-        orientation: 'portrait',
+        orientation,
         unit: 'mm',
-        format: 'a4',
+        format: pdfFormat,
       });
 
-      const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
-      const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
-
-      // Grid Layout: 3 columns x 4 rows = 12 QR codes per A4 page
-      const cols = 3;
-      const rows = 4;
-      const margin = 10;
-      const cellWidth = (pageWidth - margin * 2) / cols; // ~63.3mm
-      const cellHeight = (pageHeight - margin * 2) / rows; // ~69.2mm
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 5;
+      const cellWidth = (pageWidth - margin * 2) / cols;
+      const cellHeight = (pageHeight - margin * 2) / rows;
 
       for (let i = 0; i < qrItems.length; i++) {
         const item = qrItems[i];
-        const pageIndex = Math.floor(i / (cols * rows));
         const itemIndexOnPage = i % (cols * rows);
 
         if (itemIndexOnPage === 0 && i > 0) {
@@ -186,42 +227,39 @@ export default function QRGenerator() {
         const y = margin + row * cellHeight;
 
         // Card Border & Background
-        doc.setDrawColor(220, 226, 235);
+        doc.setDrawColor(210, 220, 235);
         doc.setLineWidth(0.3);
-        doc.roundedRect(x + 2, y + 2, cellWidth - 4, cellHeight - 4, 3, 3, 'S');
+        doc.roundedRect(x + 1.5, y + 1.5, cellWidth - 3, cellHeight - 3, 2, 2, 'S');
 
         // Header Title: JARRo
+        const headerFontSize = Math.min(cellHeight * 0.15, 10);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(79, 70, 229); // Primary Indigo
-        doc.text('JARRo', x + cellWidth / 2, y + 9, { align: 'center' });
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text('SCAN TO ORDER FOOD', x + cellWidth / 2, y + 13, { align: 'center' });
+        doc.setFontSize(headerFontSize);
+        doc.setTextColor(79, 70, 229);
+        doc.text('JARRo', x + cellWidth / 2, y + cellHeight * 0.13, { align: 'center' });
 
         // QR Code Image
-        const qrSize = 38; // 38mm x 38mm
+        const qrSize = Math.min(cellWidth * 0.65, cellHeight * 0.55);
         const qrX = x + (cellWidth - qrSize) / 2;
-        const qrY = y + 15;
+        const qrY = y + cellHeight * 0.18;
         doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
         // Footer Token
+        const footerFontSize = Math.min(cellHeight * 0.1, 7);
         doc.setFont('courier', 'bold');
-        doc.setFontSize(7);
+        doc.setFontSize(footerFontSize);
         doc.setTextColor(30, 41, 59);
-        doc.text(`ID: ${item.token.substring(0, 12)}...`, x + cellWidth / 2, y + cellHeight - 7, { align: 'center' });
+        doc.text(`ID: ${item.token.substring(0, 10)}...`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.1, { align: 'center' });
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
+        doc.setFontSize(Math.max(footerFontSize - 1.5, 5));
         doc.setTextColor(148, 163, 184);
-        doc.text(`Table Sticker #${item.index}`, x + cellWidth / 2, y + cellHeight - 3, { align: 'center' });
+        doc.text(`Sticker #${item.index}`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.03, { align: 'center' });
 
         setExportProgress(Math.round(((i + 1) / qrItems.length) * 100));
       }
 
-      doc.save(`Jarro_PrePrinted_QR_Sheet_${qrItems.length}_${activeEnv.toUpperCase()}.pdf`);
+      doc.save(`Jarro_QR_Sheet_${qrItems.length}_${paperFormat}_${activeEnv.toUpperCase()}.pdf`);
     } catch (err) {
       console.error('PDF Export Error:', err);
     } finally {
@@ -444,6 +482,76 @@ export default function QRGenerator() {
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
                 Download & Export Options
               </Typography>
+
+              {/* Paper Format Selector */}
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel>Paper Sheet Size & Layout</InputLabel>
+                <Select
+                  value={paperFormat}
+                  label="Paper Sheet Size & Layout"
+                  onChange={(e) => setPaperFormat(e.target.value)}
+                >
+                  <MenuItem value="a4-12">📄 Standard A4 (12 Stickers / Sheet - 3x4 Grid)</MenuItem>
+                  <MenuItem value="a4-20">📄 High-Density A4 (20 Stickers / Sheet - 4x5 Grid)</MenuItem>
+                  <MenuItem value="20x12-inch">🏷️ Large Sticker Sheet (20" x 12" - 32 Stickers / Sheet)</MenuItem>
+                  <MenuItem value="20x12-cm">🏷️ Compact Sticker Sheet (20cm x 12cm - 6 Stickers / Sheet)</MenuItem>
+                  <MenuItem value="a3-24">📜 Large A3 Sheet (24 Stickers / Sheet - 4x6 Grid)</MenuItem>
+                  <MenuItem value="custom">⚙️ Custom Dimensions & Grid</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Custom Paper Dimension Inputs */}
+              {paperFormat === 'custom' && (
+                <Box sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
+                    Custom Sheet Dimensions (mm):
+                  </Typography>
+                  <Grid container spacing={1} sx={{ mb: 1 }}>
+                    <Grid item xs={6}>
+                      <TextField
+                        size="small"
+                        label="Width (mm)"
+                        type="number"
+                        value={customWidthMm}
+                        onChange={(e) => setCustomWidthMm(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        size="small"
+                        label="Height (mm)"
+                        type="number"
+                        value={customHeightMm}
+                        onChange={(e) => setCustomHeightMm(e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
+                    Grid Layout (Cols x Rows):
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <TextField
+                        size="small"
+                        label="Columns"
+                        type="number"
+                        value={customCols}
+                        onChange={(e) => setCustomCols(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        size="small"
+                        label="Rows"
+                        type="number"
+                        value={customRows}
+                        onChange={(e) => setCustomRows(e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
 
               {exporting && (
                 <Box sx={{ mb: 2, textAlign: 'center' }}>
