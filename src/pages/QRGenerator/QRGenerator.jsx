@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -88,6 +88,25 @@ const getImageDimensions = (url) => {
   });
 };
 
+const DEFAULT_TEMPLATE_PRESETS = {
+  'mascot-chef': { bg: './assets/jarro_mascot_chef_qr_template.jpg', size: 48, x: 37, y: 30 },
+  'mascot-fox': { bg: './assets/jarro_mascot_fox_qr_template.jpg', size: 44, x: 48, y: 36 },
+  'mascot-rocket': { bg: './assets/jarro_mascot_rocket_qr_template.jpg', size: 42, x: 46, y: 35 },
+  'mascot-food-buddy': { bg: './assets/jarro_mascot_food_buddy_qr_template.jpg', size: 48, x: 41, y: 28 },
+  'vsafe-template': { bg: './assets/jarro_vsafe_qr_sticker_template.jpg', size: 53, x: 24, y: 34 },
+  'custom-bg': { bg: null, size: 45, x: 27.5, y: 25 },
+};
+
+const loadSavedCoords = () => {
+  try {
+    const saved = localStorage.getItem('jarro_qr_template_coords');
+    if (saved) return { ...DEFAULT_TEMPLATE_PRESETS, ...JSON.parse(saved) };
+  } catch (e) {
+    console.error('Failed to load saved QR template coords:', e);
+  }
+  return DEFAULT_TEMPLATE_PRESETS;
+};
+
 export default function QRGenerator() {
   const [tabValue, setTabValue] = useState(0);
 
@@ -114,14 +133,130 @@ export default function QRGenerator() {
   const [customCols, setCustomCols] = useState(3);
   const [customRows, setCustomRows] = useState(4);
 
-  // Custom Sticker Design Template State (Default: Mascot Chef)
+  // Custom Sticker Design Template State & Saved Coords
+  const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
   const [templateMode, setTemplateMode] = useState('mascot-chef');
-  const [customBgDataUrl, setCustomBgDataUrl] = useState('./assets/jarro_mascot_chef_qr_template.jpg');
-  const [qrSizePercent, setQrSizePercent] = useState(48); // % of card width/height
-  const [qrXPercent, setQrXPercent] = useState(37); // % X position
-  const [qrYPercent, setQrYPercent] = useState(30); // % Y position
+  const [customBgDataUrl, setCustomBgDataUrl] = useState(() => {
+    const saved = loadSavedCoords();
+    return saved['mascot-chef']?.bg || './assets/jarro_mascot_chef_qr_template.jpg';
+  });
+  const [qrSizePercent, setQrSizePercent] = useState(() => {
+    const saved = loadSavedCoords();
+    return saved['mascot-chef']?.size ?? 48;
+  });
+  const [qrXPercent, setQrXPercent] = useState(() => {
+    const saved = loadSavedCoords();
+    return saved['mascot-chef']?.x ?? 37;
+  });
+  const [qrYPercent, setQrYPercent] = useState(() => {
+    const saved = loadSavedCoords();
+    return saved['mascot-chef']?.y ?? 30;
+  });
   const [showTokenText, setShowTokenText] = useState(false);
   const [transparentBg, setTransparentBg] = useState(true);
+
+  // Drag and Drop Interactive Canvas State
+  const cardRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, startQrX: 0, startQrY: 0, cardWidth: 0, cardHeight: 0 });
+
+  // Update & Persist Coordinates
+  const updateCoords = (newSize, newX, newY) => {
+    const sizeVal = newSize !== undefined ? newSize : qrSizePercent;
+    const xVal = newX !== undefined ? newX : qrXPercent;
+    const yVal = newY !== undefined ? newY : qrYPercent;
+
+    if (newSize !== undefined) setQrSizePercent(sizeVal);
+    if (newX !== undefined) setQrXPercent(xVal);
+    if (newY !== undefined) setQrYPercent(yVal);
+
+    setTemplateCoords((prev) => {
+      const updated = {
+        ...prev,
+        [templateMode]: {
+          ...prev[templateMode],
+          size: sizeVal,
+          x: xVal,
+          y: yVal,
+          bg: customBgDataUrl,
+        },
+      };
+      try {
+        localStorage.setItem('jarro_qr_template_coords', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to save QR template coords to localStorage:', e);
+      }
+      return updated;
+    });
+  };
+
+  const handleSelectTemplate = (mode) => {
+    setTemplateMode(mode);
+    const coords = templateCoords[mode] || DEFAULT_TEMPLATE_PRESETS[mode] || DEFAULT_TEMPLATE_PRESETS['custom-bg'];
+    if (coords.bg) setCustomBgDataUrl(coords.bg);
+    setQrSizePercent(coords.size);
+    setQrXPercent(coords.x);
+    setQrYPercent(coords.y);
+    setShowTokenText(false);
+  };
+
+  // Direct Mouse / Touch Dragging Handlers
+  const handleDragStart = (e) => {
+    e.preventDefault();
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    setIsDragging(true);
+    setDragStart({
+      x: clientX,
+      y: clientY,
+      startQrX: qrXPercent,
+      startQrY: qrYPercent,
+      cardWidth: rect.width,
+      cardHeight: rect.height,
+    });
+  };
+
+  useEffect(() => {
+    const handleDragMove = (e) => {
+      if (!isDragging || !dragStart.cardWidth || !dragStart.cardHeight) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const deltaX = clientX - dragStart.x;
+      const deltaY = clientY - dragStart.y;
+
+      const deltaXPercent = (deltaX / dragStart.cardWidth) * 100;
+      const deltaYPercent = (deltaY / dragStart.cardHeight) * 100;
+
+      let newX = Math.round(dragStart.startQrX + deltaXPercent);
+      let newY = Math.round(dragStart.startQrY + deltaYPercent);
+
+      newX = Math.max(0, Math.min(100 - qrSizePercent, newX));
+      newY = Math.max(0, Math.min(100 - qrSizePercent, newY));
+
+      updateCoords(undefined, newX, newY);
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleDragMove);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchmove', handleDragMove);
+      window.addEventListener('touchend', handleDragEnd);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleDragMove);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [isDragging, dragStart, qrSizePercent]);
 
   const handleBgImageUpload = (e) => {
     const file = e.target.files[0];
@@ -634,41 +769,7 @@ export default function QRGenerator() {
                 <Select
                   value={templateMode}
                   label="Card Design Template"
-                  onChange={(e) => {
-                    const mode = e.target.value;
-                    setTemplateMode(mode);
-                    if (mode === 'mascot-chef') {
-                      setCustomBgDataUrl('./assets/jarro_mascot_chef_qr_template.jpg');
-                      setQrSizePercent(48);
-                      setQrXPercent(37);
-                      setQrYPercent(30);
-                      setShowTokenText(false);
-                    } else if (mode === 'mascot-fox') {
-                      setCustomBgDataUrl('./assets/jarro_mascot_fox_qr_template.jpg');
-                      setQrSizePercent(44);
-                      setQrXPercent(48);
-                      setQrYPercent(36);
-                      setShowTokenText(false);
-                    } else if (mode === 'mascot-rocket') {
-                      setCustomBgDataUrl('./assets/jarro_mascot_rocket_qr_template.jpg');
-                      setQrSizePercent(42);
-                      setQrXPercent(46);
-                      setQrYPercent(35);
-                      setShowTokenText(false);
-                    } else if (mode === 'mascot-food-buddy') {
-                      setCustomBgDataUrl('./assets/jarro_mascot_food_buddy_qr_template.jpg');
-                      setQrSizePercent(48);
-                      setQrXPercent(41);
-                      setQrYPercent(28);
-                      setShowTokenText(false);
-                    } else if (mode === 'vsafe-template') {
-                      setCustomBgDataUrl('./assets/jarro_vsafe_qr_sticker_template.jpg');
-                      setQrSizePercent(53);
-                      setQrXPercent(24);
-                      setQrYPercent(34);
-                      setShowTokenText(false);
-                    }
-                  }}
+                  onChange={(e) => handleSelectTemplate(e.target.value)}
                 >
                   <MenuItem value="mascot-chef">👨‍🍳 Mascot 1: Chef JARRo (Dark Navy & Gold)</MenuItem>
                   <MenuItem value="mascot-fox">🦊 Mascot 2: Red Panda Foodie (Warm Amber & Charcoal)</MenuItem>
@@ -691,9 +792,22 @@ export default function QRGenerator() {
 
                   {customBgDataUrl && (
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" fontWeight={700} color="primary" sx={{ mb: 1, display: 'block' }}>
-                        Live QR Position & Size Sliders:
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="caption" fontWeight={700} color="primary">
+                          Live QR Position & Size Controls:
+                        </Typography>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          sx={{ fontSize: '0.65rem', py: 0 }}
+                          onClick={() => {
+                            const def = DEFAULT_TEMPLATE_PRESETS[templateMode];
+                            if (def) updateCoords(def.size, def.x, def.y);
+                          }}
+                        >
+                          🔄 Reset Coordinates
+                        </Button>
+                      </Box>
 
                       <Typography variant="caption" color="text.secondary">
                         📏 QR Size: <strong>{qrSizePercent}%</strong>
@@ -703,7 +817,7 @@ export default function QRGenerator() {
                         value={qrSizePercent}
                         min={10}
                         max={90}
-                        onChange={(e, v) => setQrSizePercent(v)}
+                        onChange={(e, v) => updateCoords(v, undefined, undefined)}
                         sx={{ mb: 1 }}
                       />
 
@@ -715,7 +829,7 @@ export default function QRGenerator() {
                         value={qrXPercent}
                         min={0}
                         max={100}
-                        onChange={(e, v) => setQrXPercent(v)}
+                        onChange={(e, v) => updateCoords(undefined, v, undefined)}
                         sx={{ mb: 1 }}
                       />
 
@@ -727,7 +841,7 @@ export default function QRGenerator() {
                         value={qrYPercent}
                         min={0}
                         max={100}
-                        onChange={(e, v) => setQrYPercent(v)}
+                        onChange={(e, v) => updateCoords(undefined, undefined, v)}
                         sx={{ mb: 1 }}
                       />
 
@@ -927,7 +1041,11 @@ export default function QRGenerator() {
                 <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 2 }}>
                   {qrItems.length > 0 ? (
                     <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 360 }}>
+                      <Typography variant="caption" color="primary" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
+                        💡 Tip: Click & drag the QR code directly on the card to adjust position! (Saved automatically)
+                      </Typography>
                       <Card
+                        ref={cardRef}
                         variant="outlined"
                         sx={{
                           width: '100%',
@@ -935,11 +1053,13 @@ export default function QRGenerator() {
                           backgroundImage: customBgDataUrl ? `url(${customBgDataUrl})` : 'none',
                           backgroundSize: '100% 100%',
                           backgroundRepeat: 'no-repeat',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                          boxShadow: isDragging ? '0 12px 35px rgba(59, 130, 246, 0.35)' : '0 10px 30px rgba(0,0,0,0.18)',
                           borderRadius: 3,
                           overflow: 'hidden',
                           bgcolor: customBgDataUrl ? 'transparent' : 'background.paper',
-                          border: '1px solid #cbd5e1',
+                          border: isDragging ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+                          userSelect: 'none',
+                          touchAction: 'none',
                         }}
                       >
                         <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
@@ -948,6 +1068,8 @@ export default function QRGenerator() {
                               component="img"
                               src={qrItems[0].dataUrl}
                               alt="Live QR Code Overlay"
+                              onMouseDown={handleDragStart}
+                              onTouchStart={handleDragStart}
                               sx={{
                                 position: 'absolute',
                                 top: `${qrYPercent}%`,
@@ -955,7 +1077,14 @@ export default function QRGenerator() {
                                 width: `${qrSizePercent}%`,
                                 aspectRatio: '1 / 1',
                                 objectFit: 'contain',
-                                transition: 'all 0.02s ease',
+                                cursor: isDragging ? 'grabbing' : 'grab',
+                                outline: isDragging ? '2px dashed #3b82f6' : '1px dashed rgba(59, 130, 246, 0.5)',
+                                borderRadius: 1,
+                                transition: isDragging ? 'none' : 'all 0.02s ease',
+                                '&:hover': {
+                                  outline: '2px solid #3b82f6',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                                },
                               }}
                             />
                           ) : (
