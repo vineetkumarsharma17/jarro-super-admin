@@ -953,7 +953,7 @@ export default function QRGenerator() {
                                 top: `${qrYPercent}%`,
                                 left: `${qrXPercent}%`,
                                 width: `${qrSizePercent}%`,
-                                height: `${qrSizePercent}%`,
+                                aspectRatio: '1 / 1',
                                 objectFit: 'contain',
                                 transition: 'all 0.02s ease',
                               }}
@@ -1042,7 +1042,7 @@ export default function QRGenerator() {
                         }}
                       >
                         {customBgDataUrl ? (
-                          <Box sx={{ position: 'relative', width: '100%', pt: '100%' }}>
+                          <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
                             <Box
                               component="img"
                               src={item.dataUrl}
@@ -1052,7 +1052,7 @@ export default function QRGenerator() {
                                 top: `${qrYPercent}%`,
                                 left: `${qrXPercent}%`,
                                 width: `${qrSizePercent}%`,
-                                height: `${qrSizePercent}%`,
+                                aspectRatio: '1 / 1',
                                 objectFit: 'contain',
                               }}
                             />
