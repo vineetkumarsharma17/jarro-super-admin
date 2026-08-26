@@ -26,6 +26,9 @@ import {
   TableRow,
   IconButton,
   Tooltip,
+  Slider,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   QrCode2 as QrCodeIcon,
@@ -95,6 +98,25 @@ export default function QRGenerator() {
   const [customHeightMm, setCustomHeightMm] = useState(297);
   const [customCols, setCustomCols] = useState(3);
   const [customRows, setCustomRows] = useState(4);
+
+  // Custom Sticker Design Template State
+  const [templateMode, setTemplateMode] = useState('default'); // 'default' | 'custom-bg'
+  const [customBgDataUrl, setCustomBgDataUrl] = useState(null);
+  const [qrSizePercent, setQrSizePercent] = useState(45); // % of card width/height
+  const [qrXPercent, setQrXPercent] = useState(27.5); // % X position
+  const [qrYPercent, setQrYPercent] = useState(25); // % Y position
+  const [showTokenText, setShowTokenText] = useState(true);
+
+  const handleBgImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCustomBgDataUrl(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Set default active environment based on current environment key
   useEffect(() => {
@@ -226,35 +248,54 @@ export default function QRGenerator() {
         const x = margin + col * cellWidth;
         const y = margin + row * cellHeight;
 
-        // Card Border & Background
-        doc.setDrawColor(210, 220, 235);
-        doc.setLineWidth(0.3);
-        doc.roundedRect(x + 1.5, y + 1.5, cellWidth - 3, cellHeight - 3, 2, 2, 'S');
+        const cardWidth = cellWidth - 3;
+        const cardHeight = cellHeight - 3;
 
-        // Header Title: JARRo
-        const headerFontSize = Math.min(cellHeight * 0.15, 10);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(headerFontSize);
-        doc.setTextColor(79, 70, 229);
-        doc.text('JARRo', x + cellWidth / 2, y + cellHeight * 0.13, { align: 'center' });
+        if (templateMode === 'custom-bg' && customBgDataUrl) {
+          // Draw Custom Background Image for Sticker
+          doc.addImage(customBgDataUrl, 'PNG', x + 1.5, y + 1.5, cardWidth, cardHeight);
 
-        // QR Code Image
-        const qrSize = Math.min(cellWidth * 0.65, cellHeight * 0.55);
-        const qrX = x + (cellWidth - qrSize) / 2;
-        const qrY = y + cellHeight * 0.18;
-        doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+          // Position QR Code based on custom position sliders (%)
+          const qrSize = Math.min(cardWidth, cardHeight) * (qrSizePercent / 100);
+          const qrX = x + 1.5 + (cardWidth - qrSize) * (qrXPercent / 100);
+          const qrY = y + 1.5 + (cardHeight - qrSize) * (qrYPercent / 100);
 
-        // Footer Token
-        const footerFontSize = Math.min(cellHeight * 0.1, 7);
-        doc.setFont('courier', 'bold');
-        doc.setFontSize(footerFontSize);
-        doc.setTextColor(30, 41, 59);
-        doc.text(`ID: ${item.token.substring(0, 10)}...`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.1, { align: 'center' });
+          doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(Math.max(footerFontSize - 1.5, 5));
-        doc.setTextColor(148, 163, 184);
-        doc.text(`Sticker #${item.index}`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.03, { align: 'center' });
+          if (showTokenText) {
+            doc.setFont('courier', 'bold');
+            doc.setFontSize(Math.min(cardHeight * 0.08, 6));
+            doc.setTextColor(30, 41, 59);
+            doc.text(`ID: ${item.token.substring(0, 10)}`, x + cellWidth / 2, y + cellHeight - 2, { align: 'center' });
+          }
+        } else {
+          // Default Jarro Card Template
+          doc.setDrawColor(210, 220, 235);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(x + 1.5, y + 1.5, cardWidth, cardHeight, 2, 2, 'S');
+
+          const headerFontSize = Math.min(cellHeight * 0.15, 10);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(headerFontSize);
+          doc.setTextColor(79, 70, 229);
+          doc.text('JARRo', x + cellWidth / 2, y + cellHeight * 0.13, { align: 'center' });
+
+          const qrSize = Math.min(cellWidth * 0.65, cellHeight * 0.55);
+          const qrX = x + (cellWidth - qrSize) / 2;
+          const qrY = y + cellHeight * 0.18;
+          doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+          const footerFontSize = Math.min(cellHeight * 0.1, 7);
+          doc.setFont('courier', 'bold');
+          doc.setFontSize(footerFontSize);
+          doc.setTextColor(30, 41, 59);
+          doc.text(`ID: ${item.token.substring(0, 10)}...`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.1, { align: 'center' });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(Math.max(footerFontSize - 1.5, 5));
+          doc.setTextColor(148, 163, 184);
+          doc.text(`Sticker #${item.index}`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.03, { align: 'center' });
+        }
 
         setExportProgress(Math.round(((i + 1) / qrItems.length) * 100));
       }
@@ -479,6 +520,82 @@ export default function QRGenerator() {
 
               <Divider sx={{ my: 2 }} />
 
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                Sticker Card Design & QR Positioning
+              </Typography>
+
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel>Card Design Template</InputLabel>
+                <Select
+                  value={templateMode}
+                  label="Card Design Template"
+                  onChange={(e) => setTemplateMode(e.target.value)}
+                >
+                  <MenuItem value="default">🎨 Default Jarro Card Template</MenuItem>
+                  <MenuItem value="custom-bg">🖼️ Upload Custom Background Image Design</MenuItem>
+                </Select>
+              </FormControl>
+
+              {templateMode === 'custom-bg' && (
+                <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
+                  <Button variant="outlined" component="label" fullWidth startIcon={<UploadIcon />} sx={{ mb: 2 }}>
+                    {customBgDataUrl ? 'Change Background Image' : 'Upload Sticker Background Image'}
+                    <input type="file" accept="image/*" hidden onChange={handleBgImageUpload} />
+                  </Button>
+
+                  {customBgDataUrl && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" fontWeight={700} color="primary" sx={{ mb: 1, display: 'block' }}>
+                        Live QR Overlay Position & Size Controls:
+                      </Typography>
+
+                      <Typography variant="caption" color="text.secondary">
+                        📏 QR Size: <strong>{qrSizePercent}%</strong>
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={qrSizePercent}
+                        min={10}
+                        max={90}
+                        onChange={(e, v) => setQrSizePercent(v)}
+                        sx={{ mb: 1 }}
+                      />
+
+                      <Typography variant="caption" color="text.secondary">
+                        ↔️ Horizontal X Position: <strong>{qrXPercent}%</strong>
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={qrXPercent}
+                        min={0}
+                        max={100}
+                        onChange={(e, v) => setQrXPercent(v)}
+                        sx={{ mb: 1 }}
+                      />
+
+                      <Typography variant="caption" color="text.secondary">
+                        ↕️ Vertical Y Position: <strong>{qrYPercent}%</strong>
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={qrYPercent}
+                        min={0}
+                        max={100}
+                        onChange={(e, v) => setQrYPercent(v)}
+                        sx={{ mb: 1 }}
+                      />
+
+                      <FormControlLabel
+                        control={<Switch size="small" checked={showTokenText} onChange={(e) => setShowTokenText(e.target.checked)} />}
+                        label={<Typography variant="caption" fontWeight={600}>Print Token ID Text on Sticker</Typography>}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              <Divider sx={{ my: 2 }} />
+
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
                 Download & Export Options
               </Typography>
@@ -619,16 +736,84 @@ export default function QRGenerator() {
                 <Grid container spacing={2} sx={{ maxHeight: 550, overflowY: 'auto', pr: 1 }}>
                   {qrItems.map((item) => (
                     <Grid item xs={6} sm={4} md={3} key={item.index}>
-                      <Card variant="outlined" sx={{ textAlign: 'center', p: 1.5, position: 'relative' }}>
-                        <Typography variant="caption" fontWeight={700} color="primary.main" display="block">
-                          Sticker #{item.index}
-                        </Typography>
-                        <Box component="img" src={item.dataUrl} alt={`QR #${item.index}`} sx={{ width: '100%', height: 'auto', my: 1 }} />
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                          {item.token.substring(0, 12)}...
-                        </Typography>
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          textAlign: 'center',
+                          p: 1.5,
+                          position: 'relative',
+                          overflow: 'hidden',
+                          ...(templateMode === 'custom-bg' && customBgDataUrl
+                            ? {
+                                backgroundImage: `url(${customBgDataUrl})`,
+                                backgroundSize: '100% 100%',
+                                backgroundRepeat: 'no-repeat',
+                                minHeight: 140,
+                              }
+                            : {}),
+                        }}
+                      >
+                        {templateMode === 'custom-bg' && customBgDataUrl ? (
+                          <Box sx={{ position: 'relative', width: '100%', pt: '100%' }}>
+                            <Box
+                              component="img"
+                              src={item.dataUrl}
+                              alt={`QR #${item.index}`}
+                              sx={{
+                                position: 'absolute',
+                                top: `${qrYPercent}%`,
+                                left: `${qrXPercent}%`,
+                                width: `${qrSizePercent}%`,
+                                height: `${qrSizePercent}%`,
+                                objectFit: 'contain',
+                                transition: 'all 0.05s ease',
+                              }}
+                            />
+                            {showTokenText && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  position: 'absolute',
+                                  bottom: 2,
+                                  left: 0,
+                                  right: 0,
+                                  textAlign: 'center',
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.6rem',
+                                  bgcolor: 'rgba(255,255,255,0.7)',
+                                  py: 0.2,
+                                }}
+                              >
+                                #{item.index} {item.token.substring(0, 8)}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <>
+                            <Typography variant="caption" fontWeight={700} color="primary.main" display="block">
+                              Sticker #{item.index}
+                            </Typography>
+                            <Box component="img" src={item.dataUrl} alt={`QR #${item.index}`} sx={{ width: '100%', height: 'auto', my: 1 }} />
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontFamily: 'monospace',
+                                fontSize: '0.65rem',
+                                display: 'block',
+                                textOverflow: 'ellipsis',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {item.token.substring(0, 12)}...
+                            </Typography>
+                          </>
+                        )}
                         <Tooltip title="Copy Scan Link">
-                          <IconButton size="small" onClick={() => copyToClipboard(item.fullUrl)} sx={{ mt: 0.5 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(item.fullUrl)}
+                            sx={{ mt: 0.5, bgcolor: 'rgba(255,255,255,0.8)' }}
+                          >
                             <CopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
