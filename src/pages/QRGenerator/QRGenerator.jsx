@@ -319,26 +319,37 @@ export default function QRGenerator() {
         const x = margin + col * cellWidth;
         const y = margin + row * cellHeight;
 
-        const cardWidth = cellWidth - 3;
-        const cardHeight = cellHeight - 3;
-
         if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && customBgDataUrl) {
-          // Draw Custom Background Image for Sticker
-          doc.addImage(customBgDataUrl, 'PNG', x + 1.5, y + 1.5, cardWidth, cardHeight);
+          // Maintain exact 3:4 aspect ratio of the sticker card template on PDF sheet
+          const targetAspect = 3 / 4; // 0.75 aspect ratio
+          let drawWidth = cellWidth - 3;
+          let drawHeight = drawWidth / targetAspect;
 
-          // Position QR Code based on custom position sliders (%) - Exact match with CSS
-          const qrWidth = cardWidth * (qrSizePercent / 100);
+          if (drawHeight > cellHeight - 3) {
+            drawHeight = cellHeight - 3;
+            drawWidth = drawHeight * targetAspect;
+          }
+
+          // Center the sticker card in the grid cell
+          const drawX = x + (cellWidth - drawWidth) / 2;
+          const drawY = y + (cellHeight - drawHeight) / 2;
+
+          // Draw Custom Background Image for Sticker
+          doc.addImage(customBgDataUrl, 'PNG', drawX, drawY, drawWidth, drawHeight);
+
+          // Position QR Code based on custom position sliders (%) - Exact 1:1 match with Web Preview
+          const qrWidth = drawWidth * (qrSizePercent / 100);
           const qrHeight = qrWidth; // Square QR Code
-          const qrX = x + 1.5 + cardWidth * (qrXPercent / 100);
-          const qrY = y + 1.5 + cardHeight * (qrYPercent / 100);
+          const qrX = drawX + drawWidth * (qrXPercent / 100);
+          const qrY = drawY + drawHeight * (qrYPercent / 100);
 
           doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrWidth, qrHeight);
 
           if (showTokenText) {
             doc.setFont('courier', 'bold');
-            doc.setFontSize(Math.min(cardHeight * 0.08, 6));
+            doc.setFontSize(Math.min(drawHeight * 0.08, 6));
             doc.setTextColor(30, 41, 59);
-            doc.text(`ID: ${item.token.substring(0, 10)}`, x + cellWidth / 2, y + cellHeight - 2, { align: 'center' });
+            doc.text(`ID: ${item.token.substring(0, 10)}`, drawX + drawWidth / 2, drawY + drawHeight - 2, { align: 'center' });
           }
         } else {
           // Default Jarro Card Template
