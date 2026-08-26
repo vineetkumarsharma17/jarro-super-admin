@@ -29,6 +29,7 @@ import {
   Slider,
   Switch,
   FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import {
   QrCode2 as QrCodeIcon,
@@ -126,12 +127,33 @@ export default function QRGenerator() {
   const [validationResult, setValidationResult] = useState(null);
   const [validatorError, setValidatorError] = useState('');
 
-  // Paper & Sheet Layout State
-  const [paperFormat, setPaperFormat] = useState('a4-12');
+  // Paper & Sheet Layout State (Default: PhonePe/GPay Style 4 Standees per sheet)
+  const [paperFormat, setPaperFormat] = useState('a4-4-medium');
   const [customWidthMm, setCustomWidthMm] = useState(210);
   const [customHeightMm, setCustomHeightMm] = useState(297);
-  const [customCols, setCustomCols] = useState(3);
-  const [customRows, setCustomRows] = useState(4);
+  const [customCols, setCustomCols] = useState(2);
+  const [customRows, setCustomRows] = useState(2);
+
+  // Custom Physical Card Dimensions & Aspect Ratio Lock State
+  const [lockAspect, setLockAspect] = useState(true);
+  const [cardWidthMm, setCardWidthMm] = useState(95);
+  const [cardHeightMm, setCardHeightMm] = useState(126.6);
+
+  const handleCardWidthChange = (val) => {
+    setCardWidthMm(val);
+    const w = parseFloat(val);
+    if (lockAspect && !isNaN(w) && w > 0) {
+      setCardHeightMm((w * (4 / 3)).toFixed(1));
+    }
+  };
+
+  const handleCardHeightChange = (val) => {
+    setCardHeightMm(val);
+    const h = parseFloat(val);
+    if (lockAspect && !isNaN(h) && h > 0) {
+      setCardWidthMm((h * (3 / 4)).toFixed(1));
+    }
+  };
 
   // Custom Sticker Design Template State & Saved Coords
   const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
@@ -408,7 +430,27 @@ export default function QRGenerator() {
       let cols = 3;
       let rows = 4;
 
-      if (paperFormat === 'a4-12') {
+      if (paperFormat === 'a4-4-medium') {
+        pdfFormat = 'a4';
+        orientation = 'portrait';
+        cols = 2;
+        rows = 2;
+      } else if (paperFormat === 'a4-2-large') {
+        pdfFormat = 'a4';
+        orientation = 'landscape';
+        cols = 2;
+        rows = 1;
+      } else if (paperFormat === 'a4-1-full') {
+        pdfFormat = 'a4';
+        orientation = 'portrait';
+        cols = 1;
+        rows = 1;
+      } else if (paperFormat === 'a4-6') {
+        pdfFormat = 'a4';
+        orientation = 'portrait';
+        cols = 2;
+        rows = 3;
+      } else if (paperFormat === 'a4-12') {
         pdfFormat = 'a4';
         orientation = 'portrait';
         cols = 3;
@@ -423,23 +465,42 @@ export default function QRGenerator() {
         orientation = 'landscape';
         cols = 8;
         rows = 4;
-      } else if (paperFormat === '20x12-cm') {
-        pdfFormat = [200, 120]; // 20cm x 12cm in mm
-        orientation = 'landscape';
-        cols = 3;
-        rows = 2;
       } else if (paperFormat === 'a3-24') {
         pdfFormat = 'a3';
         orientation = 'portrait';
         cols = 4;
         rows = 6;
       } else if (paperFormat === 'custom') {
-        const w = parseFloat(customWidthMm) || 210;
-        const h = parseFloat(customHeightMm) || 297;
-        pdfFormat = [w, h];
-        orientation = w >= h ? 'landscape' : 'portrait';
-        cols = Math.max(parseInt(customCols) || 1, 1);
-        rows = Math.max(parseInt(customRows) || 1, 1);
+        const pageW = parseFloat(customWidthMm) || 210;
+        const pageH = parseFloat(customHeightMm) || 297;
+        pdfFormat = [pageW, pageH];
+        orientation = pageW >= pageH ? 'landscape' : 'portrait';
+
+        const reqCardW = parseFloat(cardWidthMm);
+        const reqCardH = parseFloat(cardHeightMm);
+
+        if (!isNaN(reqCardW) && reqCardW > 0 && !isNaN(reqCardH) && reqCardH > 0) {
+          cols = Math.max(1, Math.floor((pageW - 10) / reqCardW));
+          rows = Math.max(1, Math.floor((pageH - 10) / reqCardH));
+        } else {
+          cols = Math.max(parseInt(customCols) || 1, 1);
+          rows = Math.max(parseInt(customRows) || 1, 1);
+        }
+      }
+
+      // Explicit User Page Orientation Override (Portrait vs Landscape)
+      if (pdfPageOrientation === 'portrait' || pdfPageOrientation === 'landscape') {
+        orientation = pdfPageOrientation;
+        // Swap cols/rows if orientation was flipped so grid auto-adapts
+        if (pdfPageOrientation === 'landscape' && cols < rows) {
+          const temp = cols;
+          cols = rows;
+          rows = temp;
+        } else if (pdfPageOrientation === 'portrait' && cols > rows) {
+          const temp = cols;
+          cols = rows;
+          rows = temp;
+        }
       }
 
       const doc = new jsPDF({
@@ -887,26 +948,88 @@ export default function QRGenerator() {
                   label="Paper Sheet Size & Layout"
                   onChange={(e) => setPaperFormat(e.target.value)}
                 >
-                  <MenuItem value="a4-12">📄 Standard A4 (12 Stickers / Sheet - 3x4 Grid)</MenuItem>
-                  <MenuItem value="a4-20">📄 High-Density A4 (20 Stickers / Sheet - 4x5 Grid)</MenuItem>
-                  <MenuItem value="20x12-inch">🏷️ Large Sticker Sheet (20" x 12" - 32 Stickers / Sheet)</MenuItem>
-                  <MenuItem value="20x12-cm">🏷️ Compact Sticker Sheet (20cm x 12cm - 6 Stickers / Sheet)</MenuItem>
+                  <MenuItem value="a4-4-medium">📱 PhonePe / GPay Style Standee (A4 - 4 Big Standees / Sheet, 2x2 Grid)</MenuItem>
+                  <MenuItem value="a4-2-large">🏆 PhonePe / GPay Jumbo Standee (A4 - 2 Extra Large Standees / Sheet, 2x1 Grid)</MenuItem>
+                  <MenuItem value="a4-1-full">📜 Full Page Table Standee (A4 - 1 Massive Standee / Page, 1x1 Grid)</MenuItem>
+                  <MenuItem value="a4-6">📄 Standard Table Standee (A4 - 6 Standees / Sheet, 2x3 Grid)</MenuItem>
+                  <MenuItem value="a4-12">🏷️ Compact ID-Size Stickers (A4 - 12 Stickers / Sheet, 3x4 Grid)</MenuItem>
+                  <MenuItem value="a4-20">🏷️ High-Density Stickers (A4 - 20 Stickers / Sheet, 4x5 Grid)</MenuItem>
+                  <MenuItem value="20x12-inch">🏷️ Large Vinyl Sheet (20" x 12" - 32 Stickers / Sheet)</MenuItem>
                   <MenuItem value="a3-24">📜 Large A3 Sheet (24 Stickers / Sheet - 4x6 Grid)</MenuItem>
-                  <MenuItem value="custom">⚙️ Custom Dimensions & Grid</MenuItem>
+                  <MenuItem value="custom">⚙️ Custom Physical Card Size & Grid (With 3:4 Aspect Lock)</MenuItem>
                 </Select>
               </FormControl>
 
-              {/* Custom Paper Dimension Inputs */}
+              {/* Page Orientation Selector */}
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel>Page Orientation (Vertical vs Horizontal)</InputLabel>
+                <Select
+                  value={pdfPageOrientation}
+                  label="Page Orientation (Vertical vs Horizontal)"
+                  onChange={(e) => setPdfPageOrientation(e.target.value)}
+                >
+                  <MenuItem value="auto">⚡ Auto-Fit Best Orientation (Recommended)</MenuItem>
+                  <MenuItem value="portrait">📱 Portrait (Vertical Sheet)</MenuItem>
+                  <MenuItem value="landscape">🖼️ Landscape (Horizontal Sheet)</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Custom Physical Card Dimension Inputs */}
               {paperFormat === 'custom' && (
                 <Box sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
-                    Custom Sheet Dimensions (mm):
+                  <Typography variant="caption" fontWeight={700} color="primary" sx={{ mb: 1, display: 'block' }}>
+                    📐 Physical Card Size (Standee / Sticker Dimensions):
                   </Typography>
                   <Grid container spacing={1} sx={{ mb: 1 }}>
                     <Grid item xs={6}>
                       <TextField
+                        fullWidth
                         size="small"
-                        label="Width (mm)"
+                        label="Card Width (mm)"
+                        type="number"
+                        value={cardWidthMm}
+                        onChange={(e) => handleCardWidthChange(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Card Height (mm)"
+                        type="number"
+                        value={cardHeightMm}
+                        onChange={(e) => handleCardHeightChange(e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={lockAspect}
+                        onChange={(e) => {
+                          setLockAspect(e.target.checked);
+                          if (e.target.checked && cardWidthMm > 0) {
+                            setCardHeightMm((parseFloat(cardWidthMm) * (4 / 3)).toFixed(1));
+                          }
+                        }}
+                      />
+                    }
+                    label={<Typography variant="caption" fontWeight={700}>🔒 Lock 3:4 Aspect Ratio (Auto Height)</Typography>}
+                  />
+
+                  <Divider sx={{ my: 1.5 }} />
+
+                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    📄 Sheet Dimensions (mm):
+                  </Typography>
+                  <Grid container spacing={1} sx={{ mb: 1 }}>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Sheet Width (mm)"
                         type="number"
                         value={customWidthMm}
                         onChange={(e) => setCustomWidthMm(e.target.value)}
@@ -914,35 +1037,12 @@ export default function QRGenerator() {
                     </Grid>
                     <Grid item xs={6}>
                       <TextField
+                        fullWidth
                         size="small"
-                        label="Height (mm)"
+                        label="Sheet Height (mm)"
                         type="number"
                         value={customHeightMm}
                         onChange={(e) => setCustomHeightMm(e.target.value)}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
-                    Grid Layout (Cols x Rows):
-                  </Typography>
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <TextField
-                        size="small"
-                        label="Columns"
-                        type="number"
-                        value={customCols}
-                        onChange={(e) => setCustomCols(e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        size="small"
-                        label="Rows"
-                        type="number"
-                        value={customRows}
-                        onChange={(e) => setCustomRows(e.target.value)}
                       />
                     </Grid>
                   </Grid>
