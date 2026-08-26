@@ -320,16 +320,17 @@ export default function QRGenerator() {
         const cardWidth = cellWidth - 3;
         const cardHeight = cellHeight - 3;
 
-        if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode === 'mascot-chef') && customBgDataUrl) {
+        if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && customBgDataUrl) {
           // Draw Custom Background Image for Sticker
           doc.addImage(customBgDataUrl, 'PNG', x + 1.5, y + 1.5, cardWidth, cardHeight);
 
-          // Position QR Code based on custom position sliders (%)
-          const qrSize = Math.min(cardWidth, cardHeight) * (qrSizePercent / 100);
-          const qrX = x + 1.5 + (cardWidth - qrSize) * (qrXPercent / 100);
-          const qrY = y + 1.5 + (cardHeight - qrSize) * (qrYPercent / 100);
+          // Position QR Code based on custom position sliders (%) - Exact match with CSS
+          const qrWidth = cardWidth * (qrSizePercent / 100);
+          const qrHeight = qrWidth; // Square QR Code
+          const qrX = x + 1.5 + cardWidth * (qrXPercent / 100);
+          const qrY = y + 1.5 + cardHeight * (qrYPercent / 100);
 
-          doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+          doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrWidth, qrHeight);
 
           if (showTokenText) {
             doc.setFont('courier', 'bold');
@@ -603,27 +604,48 @@ export default function QRGenerator() {
                     setTemplateMode(mode);
                     if (mode === 'mascot-chef') {
                       setCustomBgDataUrl('./assets/jarro_mascot_chef_qr_template.jpg');
-                      setQrSizePercent(53);
-                      setQrXPercent(42);
+                      setQrSizePercent(48);
+                      setQrXPercent(37);
                       setQrYPercent(30);
+                      setShowTokenText(false);
+                    } else if (mode === 'mascot-fox') {
+                      setCustomBgDataUrl('./assets/jarro_mascot_fox_qr_template.jpg');
+                      setQrSizePercent(44);
+                      setQrXPercent(48);
+                      setQrYPercent(36);
+                      setShowTokenText(false);
+                    } else if (mode === 'mascot-rocket') {
+                      setCustomBgDataUrl('./assets/jarro_mascot_rocket_qr_template.jpg');
+                      setQrSizePercent(42);
+                      setQrXPercent(46);
+                      setQrYPercent(35);
+                      setShowTokenText(false);
+                    } else if (mode === 'mascot-food-buddy') {
+                      setCustomBgDataUrl('./assets/jarro_mascot_food_buddy_qr_template.jpg');
+                      setQrSizePercent(48);
+                      setQrXPercent(41);
+                      setQrYPercent(28);
                       setShowTokenText(false);
                     } else if (mode === 'vsafe-template') {
                       setCustomBgDataUrl('./assets/jarro_vsafe_qr_sticker_template.jpg');
                       setQrSizePercent(53);
-                      setQrXPercent(27);
+                      setQrXPercent(24);
                       setQrYPercent(34);
                       setShowTokenText(false);
                     }
                   }}
                 >
-                  <MenuItem value="mascot-chef">👨‍🍳 Mascot Chef JARRo & vSafe Template (Recommended)</MenuItem>
-                  <MenuItem value="vsafe-template">🌟 Official JARRo & vSafe Branded Sticker Template</MenuItem>
-                  <MenuItem value="default">🎨 Default Jarro Card Template</MenuItem>
+                  <MenuItem value="mascot-chef">👨‍🍳 Mascot 1: Chef JARRo (Dark Navy & Gold)</MenuItem>
+                  <MenuItem value="mascot-fox">🦊 Mascot 2: Red Panda Foodie (Warm Amber & Charcoal)</MenuItem>
+                  <MenuItem value="mascot-rocket">⚡ Mascot 3: Superhero Express (Neon Blue & Cyan)</MenuItem>
+                  <MenuItem value="mascot-food-buddy">🍕 Mascot 4: Pizza & Noodle Buddies (Crimson Bistro)</MenuItem>
+                  <MenuItem value="vsafe-template">🌟 Official JARRo Classic Gold Card</MenuItem>
+                  <MenuItem value="default">🎨 Default Jarro Simple Card</MenuItem>
                   <MenuItem value="custom-bg">🖼️ Upload Custom Background Image Design</MenuItem>
                 </Select>
               </FormControl>
 
-              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode === 'mascot-chef') && (
+              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && (
                 <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
                   {templateMode === 'custom-bg' && (
                     <Button variant="outlined" component="label" fullWidth startIcon={<UploadIcon />} sx={{ mb: 2 }}>
@@ -635,7 +657,7 @@ export default function QRGenerator() {
                   {customBgDataUrl && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="caption" fontWeight={700} color="primary" sx={{ mb: 1, display: 'block' }}>
-                        Live QR Overlay Position & Size Controls:
+                        Live QR Position & Size Sliders:
                       </Typography>
 
                       <Typography variant="caption" color="text.secondary">
@@ -678,6 +700,66 @@ export default function QRGenerator() {
                         control={<Switch size="small" checked={showTokenText} onChange={(e) => setShowTokenText(e.target.checked)} />}
                         label={<Typography variant="caption" fontWeight={600}>Print Token ID Text on Sticker</Typography>}
                       />
+
+                      {/* BIG SINGLE LIVE PREVIEW CARD */}
+                      <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid #e2e8f0' }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 1, textAlign: 'center' }}>
+                          🎯 Live Single Sticker Designer Preview:
+                        </Typography>
+                        <Card
+                          variant="outlined"
+                          sx={{
+                            width: '100%',
+                            maxWidth: 300,
+                            margin: '0 auto',
+                            position: 'relative',
+                            backgroundImage: `url(${customBgDataUrl})`,
+                            backgroundSize: '100% 100%',
+                            backgroundRepeat: 'no-repeat',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
+                            {qrItems.length > 0 && (
+                              <Box
+                                component="img"
+                                src={qrItems[0].dataUrl}
+                                alt="Live QR Preview"
+                                sx={{
+                                  position: 'absolute',
+                                  top: `${qrYPercent}%`,
+                                  left: `${qrXPercent}%`,
+                                  width: `${qrSizePercent}%`,
+                                  height: `${qrSizePercent}%`,
+                                  objectFit: 'contain',
+                                  transition: 'all 0.02s ease',
+                                }}
+                              />
+                            )}
+                            {showTokenText && qrItems.length > 0 && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  position: 'absolute',
+                                  bottom: 4,
+                                  left: 0,
+                                  right: 0,
+                                  textAlign: 'center',
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.65rem',
+                                  bgcolor: 'rgba(255,255,255,0.85)',
+                                  py: 0.2,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ID: {qrItems[0].token.substring(0, 10)}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Card>
+                      </Box>
                     </Box>
                   )}
                 </Box>
