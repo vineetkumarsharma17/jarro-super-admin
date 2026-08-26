@@ -80,11 +80,12 @@ export default function QRGenerator() {
   // Generator State
   const [activeEnv, setActiveEnv] = useState('prod');
   const [customDomain, setCustomDomain] = useState('');
-  const [count, setCount] = useState(100);
+  const [count, setCount] = useState(1);
   const [qrItems, setQrItems] = useState([]); // [{ token, fullUrl, dataUrl }]
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [rightPanelView, setRightPanelView] = useState('preview'); // 'preview' | 'grid'
 
   // Validator State
   const [validatorInput, setValidatorInput] = useState('');
@@ -99,13 +100,13 @@ export default function QRGenerator() {
   const [customCols, setCustomCols] = useState(3);
   const [customRows, setCustomRows] = useState(4);
 
-  // Custom Sticker Design Template State
-  const [templateMode, setTemplateMode] = useState('default'); // 'default' | 'custom-bg'
-  const [customBgDataUrl, setCustomBgDataUrl] = useState(null);
-  const [qrSizePercent, setQrSizePercent] = useState(45); // % of card width/height
-  const [qrXPercent, setQrXPercent] = useState(27.5); // % X position
-  const [qrYPercent, setQrYPercent] = useState(25); // % Y position
-  const [showTokenText, setShowTokenText] = useState(true);
+  // Custom Sticker Design Template State (Default: Mascot Chef)
+  const [templateMode, setTemplateMode] = useState('mascot-chef');
+  const [customBgDataUrl, setCustomBgDataUrl] = useState('./assets/jarro_mascot_chef_qr_template.jpg');
+  const [qrSizePercent, setQrSizePercent] = useState(48); // % of card width/height
+  const [qrXPercent, setQrXPercent] = useState(37); // % X position
+  const [qrYPercent, setQrYPercent] = useState(30); // % Y position
+  const [showTokenText, setShowTokenText] = useState(false);
 
   const handleBgImageUpload = (e) => {
     const file = e.target.files[0];
@@ -701,65 +702,6 @@ export default function QRGenerator() {
                         label={<Typography variant="caption" fontWeight={600}>Print Token ID Text on Sticker</Typography>}
                       />
 
-                      {/* BIG SINGLE LIVE PREVIEW CARD */}
-                      <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid #e2e8f0' }}>
-                        <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 1, textAlign: 'center' }}>
-                          🎯 Live Single Sticker Designer Preview:
-                        </Typography>
-                        <Card
-                          variant="outlined"
-                          sx={{
-                            width: '100%',
-                            maxWidth: 300,
-                            margin: '0 auto',
-                            position: 'relative',
-                            backgroundImage: `url(${customBgDataUrl})`,
-                            backgroundSize: '100% 100%',
-                            backgroundRepeat: 'no-repeat',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
-                            {qrItems.length > 0 && (
-                              <Box
-                                component="img"
-                                src={qrItems[0].dataUrl}
-                                alt="Live QR Preview"
-                                sx={{
-                                  position: 'absolute',
-                                  top: `${qrYPercent}%`,
-                                  left: `${qrXPercent}%`,
-                                  width: `${qrSizePercent}%`,
-                                  height: `${qrSizePercent}%`,
-                                  objectFit: 'contain',
-                                  transition: 'all 0.02s ease',
-                                }}
-                              />
-                            )}
-                            {showTokenText && qrItems.length > 0 && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  position: 'absolute',
-                                  bottom: 4,
-                                  left: 0,
-                                  right: 0,
-                                  textAlign: 'center',
-                                  fontFamily: 'monospace',
-                                  fontSize: '0.65rem',
-                                  bgcolor: 'rgba(255,255,255,0.85)',
-                                  py: 0.2,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                ID: {qrItems[0].token.substring(0, 10)}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Card>
-                      </Box>
                     </Box>
                   )}
                 </Box>
@@ -888,21 +830,38 @@ export default function QRGenerator() {
           </Grid>
 
           <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 450 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 520, display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
                 <Typography variant="h6" fontWeight={700}>
-                  Generated Batch Preview ({qrItems.length} QR Codes)
+                  {rightPanelView === 'preview' ? '🎯 Sticker Designer Live Preview' : `📊 Generated Batch Grid (${qrItems.length} QR Codes)`}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Box sx={{ bgcolor: 'background.default', p: 0.5, borderRadius: 2, display: 'flex', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant={rightPanelView === 'preview' ? 'contained' : 'outlined'}
+                      onClick={() => setRightPanelView('preview')}
+                      sx={{ fontWeight: 600, py: 0.4 }}
+                    >
+                      🎯 Single Preview
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={rightPanelView === 'grid' ? 'contained' : 'outlined'}
+                      onClick={() => setRightPanelView('grid')}
+                      sx={{ fontWeight: 600, py: 0.4 }}
+                    >
+                      📊 Batch Grid ({qrItems.length})
+                    </Button>
+                  </Box>
                   {isVerifiedUnique && (
-                    <Chip label="🔒 100% Server Verified Unassigned & Unique" color="success" size="small" />
+                    <Chip label="🔒 100% Server Verified" color="success" size="small" />
                   )}
-                  <Chip label={`Target: ${getBaseScanUrl()}`} color="primary" variant="outlined" size="small" />
                 </Box>
               </Box>
 
               {generating ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 12 }}>
                   <CircularProgress size={48} />
                   <Typography variant="body1" fontWeight={600} color="primary.main" sx={{ mt: 2 }}>
                     {generatingStatus || 'Checking database & rendering QR codes...'}
@@ -911,7 +870,105 @@ export default function QRGenerator() {
                     Validating all tokens against MongoDB to ensure zero conflicts with existing tables.
                   </Typography>
                 </Box>
+              ) : rightPanelView === 'preview' ? (
+                /* SINGLE LARGE LIVE PREVIEW CARD ON THE RIGHT SIDE */
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                  {qrItems.length > 0 ? (
+                    <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 360 }}>
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          width: '100%',
+                          position: 'relative',
+                          backgroundImage: customBgDataUrl ? `url(${customBgDataUrl})` : 'none',
+                          backgroundSize: '100% 100%',
+                          backgroundRepeat: 'no-repeat',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                          borderRadius: 3,
+                          overflow: 'hidden',
+                          bgcolor: customBgDataUrl ? 'transparent' : 'background.paper',
+                          border: '1px solid #cbd5e1',
+                        }}
+                      >
+                        <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
+                          {customBgDataUrl ? (
+                            <Box
+                              component="img"
+                              src={qrItems[0].dataUrl}
+                              alt="Live QR Code Overlay"
+                              sx={{
+                                position: 'absolute',
+                                top: `${qrYPercent}%`,
+                                left: `${qrXPercent}%`,
+                                width: `${qrSizePercent}%`,
+                                height: `${qrSizePercent}%`,
+                                objectFit: 'contain',
+                                transition: 'all 0.02s ease',
+                              }}
+                            />
+                          ) : (
+                            <Box sx={{ position: 'absolute', inset: 0, p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Typography variant="h4" fontWeight={800} color="primary.main">
+                                JARRo
+                              </Typography>
+                              <Box component="img" src={qrItems[0].dataUrl} sx={{ width: '70%', height: 'auto' }} />
+                              <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                                ID: {qrItems[0].token.substring(0, 12)}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {showTokenText && customBgDataUrl && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                position: 'absolute',
+                                bottom: 6,
+                                left: 0,
+                                right: 0,
+                                textAlign: 'center',
+                                fontFamily: 'monospace',
+                                fontSize: '0.75rem',
+                                bgcolor: 'rgba(255,255,255,0.9)',
+                                py: 0.3,
+                                fontWeight: 700,
+                              }}
+                            >
+                              ID: {qrItems[0].token.substring(0, 12)}...
+                            </Typography>
+                          )}
+                        </Box>
+                      </Card>
+
+                      <Box sx={{ mt: 2.5, p: 2, bgcolor: 'background.default', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ textAlign: 'left' }}>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Live 24-Digit Token:
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                            {qrItems[0].token}
+                          </Typography>
+                        </Box>
+                        <Tooltip title="Copy Target Scan Link">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<CopyIcon />}
+                            onClick={() => copyToClipboard(qrItems[0].fullUrl)}
+                          >
+                            Copy Scan Link
+                          </Button>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Click "Generate QR Codes" on the left to view live designer preview.
+                    </Typography>
+                  )}
+                </Box>
               ) : (
+                /* BATCH GALLERY GRID VIEW */
                 <Grid container spacing={2} sx={{ maxHeight: 550, overflowY: 'auto', pr: 1 }}>
                   {qrItems.map((item) => (
                     <Grid item xs={6} sm={4} md={3} key={item.index}>
@@ -922,7 +979,7 @@ export default function QRGenerator() {
                           p: 1.5,
                           position: 'relative',
                           overflow: 'hidden',
-                          ...((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode === 'mascot-chef') && customBgDataUrl
+                          ...(customBgDataUrl
                             ? {
                                 backgroundImage: `url(${customBgDataUrl})`,
                                 backgroundSize: '100% 100%',
@@ -932,7 +989,7 @@ export default function QRGenerator() {
                             : {}),
                         }}
                       >
-                        {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode === 'mascot-chef') && customBgDataUrl ? (
+                        {customBgDataUrl ? (
                           <Box sx={{ position: 'relative', width: '100%', pt: '100%' }}>
                             <Box
                               component="img"
@@ -945,27 +1002,8 @@ export default function QRGenerator() {
                                 width: `${qrSizePercent}%`,
                                 height: `${qrSizePercent}%`,
                                 objectFit: 'contain',
-                                transition: 'all 0.05s ease',
                               }}
                             />
-                            {showTokenText && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  position: 'absolute',
-                                  bottom: 2,
-                                  left: 0,
-                                  right: 0,
-                                  textAlign: 'center',
-                                  fontFamily: 'monospace',
-                                  fontSize: '0.6rem',
-                                  bgcolor: 'rgba(255,255,255,0.7)',
-                                  py: 0.2,
-                                }}
-                              >
-                                #{item.index} {item.token.substring(0, 8)}
-                              </Typography>
-                            )}
                           </Box>
                         ) : (
                           <>
