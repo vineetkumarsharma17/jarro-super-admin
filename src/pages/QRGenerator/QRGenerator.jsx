@@ -320,7 +320,7 @@ export default function QRGenerator() {
         const cardWidth = cellWidth - 3;
         const cardHeight = cellHeight - 3;
 
-        if (templateMode === 'custom-bg' && customBgDataUrl) {
+        if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template') && customBgDataUrl) {
           // Draw Custom Background Image for Sticker
           doc.addImage(customBgDataUrl, 'PNG', x + 1.5, y + 1.5, cardWidth, cardHeight);
 
@@ -598,19 +598,32 @@ export default function QRGenerator() {
                 <Select
                   value={templateMode}
                   label="Card Design Template"
-                  onChange={(e) => setTemplateMode(e.target.value)}
+                  onChange={(e) => {
+                    const mode = e.target.value;
+                    setTemplateMode(mode);
+                    if (mode === 'vsafe-template') {
+                      setCustomBgDataUrl('./assets/jarro_vsafe_qr_sticker_template.jpg');
+                      setQrSizePercent(53);
+                      setQrXPercent(27);
+                      setQrYPercent(34);
+                      setShowTokenText(false);
+                    }
+                  }}
                 >
                   <MenuItem value="default">🎨 Default Jarro Card Template</MenuItem>
+                  <MenuItem value="vsafe-template">🌟 Official JARRo & vSafe Branded Sticker Template</MenuItem>
                   <MenuItem value="custom-bg">🖼️ Upload Custom Background Image Design</MenuItem>
                 </Select>
               </FormControl>
 
-              {templateMode === 'custom-bg' && (
+              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template') && (
                 <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
-                  <Button variant="outlined" component="label" fullWidth startIcon={<UploadIcon />} sx={{ mb: 2 }}>
-                    {customBgDataUrl ? 'Change Background Image' : 'Upload Sticker Background Image'}
-                    <input type="file" accept="image/*" hidden onChange={handleBgImageUpload} />
-                  </Button>
+                  {templateMode === 'custom-bg' && (
+                    <Button variant="outlined" component="label" fullWidth startIcon={<UploadIcon />} sx={{ mb: 2 }}>
+                      {customBgDataUrl ? 'Change Background Image' : 'Upload Sticker Background Image'}
+                      <input type="file" accept="image/*" hidden onChange={handleBgImageUpload} />
+                    </Button>
+                  )}
 
                   {customBgDataUrl && (
                     <Box sx={{ mb: 2 }}>
@@ -820,7 +833,7 @@ export default function QRGenerator() {
                           p: 1.5,
                           position: 'relative',
                           overflow: 'hidden',
-                          ...(templateMode === 'custom-bg' && customBgDataUrl
+                          ...((templateMode === 'custom-bg' || templateMode === 'vsafe-template') && customBgDataUrl
                             ? {
                                 backgroundImage: `url(${customBgDataUrl})`,
                                 backgroundSize: '100% 100%',
@@ -830,7 +843,7 @@ export default function QRGenerator() {
                             : {}),
                         }}
                       >
-                        {templateMode === 'custom-bg' && customBgDataUrl ? (
+                        {(templateMode === 'custom-bg' || templateMode === 'vsafe-template') && customBgDataUrl ? (
                           <Box sx={{ position: 'relative', width: '100%', pt: '100%' }}>
                             <Box
                               component="img"
