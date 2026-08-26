@@ -74,6 +74,20 @@ const extractTokenFromInput = (input) => {
   return trimmed;
 };
 
+// Helper function to measure exact native aspect ratio of template image
+const getImageDimensions = (url) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth || 600, height: img.naturalHeight || 800 });
+    };
+    img.onerror = () => {
+      resolve({ width: 600, height: 800 });
+    };
+    img.src = url;
+  });
+};
+
 export default function QRGenerator() {
   const [tabValue, setTabValue] = useState(0);
 
@@ -305,6 +319,15 @@ export default function QRGenerator() {
       const cellWidth = (pageWidth - margin * 2) / cols;
       const cellHeight = (pageHeight - margin * 2) / rows;
 
+      // Measure true native aspect ratio of template image
+      let nativeAspect = 3 / 4;
+      if (customBgDataUrl) {
+        const { width: w, height: h } = await getImageDimensions(customBgDataUrl);
+        if (w > 0 && h > 0) {
+          nativeAspect = w / h;
+        }
+      }
+
       for (let i = 0; i < qrItems.length; i++) {
         const item = qrItems[i];
         const itemIndexOnPage = i % (cols * rows);
@@ -320,22 +343,21 @@ export default function QRGenerator() {
         const y = margin + row * cellHeight;
 
         if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && customBgDataUrl) {
-          // Maintain exact 3:4 aspect ratio of the sticker card template on PDF sheet
-          const targetAspect = 3 / 4; // 0.75 aspect ratio
-          let drawWidth = cellWidth - 3;
-          let drawHeight = drawWidth / targetAspect;
+          // Maintain 100% native aspect ratio of the sticker card template with ZERO stretching
+          let drawWidth = cellWidth - 2;
+          let drawHeight = drawWidth / nativeAspect;
 
-          if (drawHeight > cellHeight - 3) {
-            drawHeight = cellHeight - 3;
-            drawWidth = drawHeight * targetAspect;
+          if (drawHeight > cellHeight - 2) {
+            drawHeight = cellHeight - 2;
+            drawWidth = drawHeight * nativeAspect;
           }
 
           // Center the sticker card in the grid cell
           const drawX = x + (cellWidth - drawWidth) / 2;
           const drawY = y + (cellHeight - drawHeight) / 2;
 
-          // Draw Custom Background Image for Sticker
-          doc.addImage(customBgDataUrl, 'PNG', drawX, drawY, drawWidth, drawHeight);
+          // Draw Custom Background Image for Sticker (Zero Distortion)
+          doc.addImage(customBgDataUrl, 'JPEG', drawX, drawY, drawWidth, drawHeight, undefined, 'FAST');
 
           // Position QR Code based on custom position sliders (%) - Exact 1:1 match with Web Preview
           const qrWidth = drawWidth * (qrSizePercent / 100);
