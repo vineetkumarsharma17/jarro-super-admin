@@ -107,6 +107,7 @@ export default function QRGenerator() {
   const [qrXPercent, setQrXPercent] = useState(37); // % X position
   const [qrYPercent, setQrYPercent] = useState(30); // % Y position
   const [showTokenText, setShowTokenText] = useState(false);
+  const [transparentBg, setTransparentBg] = useState(true);
 
   const handleBgImageUpload = (e) => {
     const file = e.target.files[0];
@@ -224,9 +225,9 @@ export default function QRGenerator() {
         const token = finalTokens[i];
         const fullUrl = `${baseUrl}/?data=${token}`;
         const dataUrl = await QRCode.toDataURL(fullUrl, {
-          width: 300,
+          width: 400,
           margin: 1,
-          color: { dark: '#000000', light: '#ffffff' },
+          color: { dark: '#000000', light: transparentBg ? '#00000000' : '#ffffff' },
         });
         newItems.push({ index: i + 1, token, fullUrl, dataUrl });
       }
@@ -241,10 +242,10 @@ export default function QRGenerator() {
     }
   };
 
-  // Generate immediately on first load
+  // Generate immediately on first load or when activeEnv or transparentBg changes
   useEffect(() => {
     handleGenerateBatch();
-  }, [activeEnv]);
+  }, [activeEnv, transparentBg]);
 
   // Export PDF Sheet (Multi-layout QR stickers grid)
   const handleExportPDF = async () => {
@@ -697,10 +698,28 @@ export default function QRGenerator() {
                         sx={{ mb: 1 }}
                       />
 
-                      <FormControlLabel
-                        control={<Switch size="small" checked={showTokenText} onChange={(e) => setShowTokenText(e.target.checked)} />}
-                        label={<Typography variant="caption" fontWeight={600}>Print Token ID Text on Sticker</Typography>}
-                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={transparentBg}
+                              onChange={(e) => setTransparentBg(e.target.checked)}
+                            />
+                          }
+                          label={<Typography variant="caption" fontWeight={600}>🏁 Transparent QR Background (Seamless Blend)</Typography>}
+                        />
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={showTokenText}
+                              onChange={(e) => setShowTokenText(e.target.checked)}
+                            />
+                          }
+                          label={<Typography variant="caption" fontWeight={600}>Print Token ID Text on Sticker</Typography>}
+                        />
+                      </Box>
 
                     </Box>
                   )}
