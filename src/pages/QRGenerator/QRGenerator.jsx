@@ -89,19 +89,36 @@ const getImageDimensions = (url) => {
   });
 };
 
+const getAssetPath = (filename) => {
+  if (!filename) return null;
+  if (filename.startsWith('data:') || filename.startsWith('http://') || filename.startsWith('https://')) {
+    return filename;
+  }
+  const base = import.meta.env.BASE_URL || '/';
+  const cleanBase = base.endsWith('/') ? base : base + '/';
+  const cleanFilename = filename.startsWith('./') ? filename.substring(2) : filename;
+  const pathWithoutAssets = cleanFilename.startsWith('assets/') ? cleanFilename : `assets/${cleanFilename}`;
+  return `${cleanBase}${pathWithoutAssets}`;
+};
+
 const DEFAULT_TEMPLATE_PRESETS = {
-  'mascot-chef': { bg: './assets/jarro_mascot_chef_qr_template.jpg', size: 48, x: 37, y: 30 },
-  'mascot-fox': { bg: './assets/jarro_mascot_fox_qr_template.jpg', size: 44, x: 48, y: 36 },
-  'mascot-rocket': { bg: './assets/jarro_mascot_rocket_qr_template.jpg', size: 42, x: 46, y: 35 },
-  'mascot-food-buddy': { bg: './assets/jarro_mascot_food_buddy_qr_template.jpg', size: 48, x: 41, y: 28 },
-  'vsafe-template': { bg: './assets/jarro_vsafe_qr_sticker_template.jpg', size: 53, x: 24, y: 34 },
+  'mascot-chef': { bg: getAssetPath('jarro_mascot_chef_qr_template.jpg'), size: 48, x: 37, y: 30 },
+  'mascot-fox': { bg: getAssetPath('jarro_mascot_fox_qr_template.jpg'), size: 44, x: 48, y: 36 },
+  'mascot-rocket': { bg: getAssetPath('jarro_mascot_rocket_qr_template.jpg'), size: 42, x: 46, y: 35 },
+  'mascot-food-buddy': { bg: getAssetPath('jarro_mascot_food_buddy_qr_template.jpg'), size: 48, x: 41, y: 28 },
+  'vsafe-template': { bg: getAssetPath('jarro_vsafe_qr_sticker_template.jpg'), size: 53, x: 24, y: 34 },
   'custom-bg': { bg: null, size: 45, x: 27.5, y: 25 },
 };
 
 const loadSavedCoords = () => {
   try {
     const saved = localStorage.getItem('jarro_qr_template_coords');
-    if (saved) return { ...DEFAULT_TEMPLATE_PRESETS, ...JSON.parse(saved) };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return { ...DEFAULT_TEMPLATE_PRESETS, ...parsed };
+      }
+    }
   } catch (e) {
     console.error('Failed to load saved QR template coords:', e);
   }
@@ -129,6 +146,7 @@ export default function QRGenerator() {
 
   // Paper & Sheet Layout State (Default: PhonePe/GPay Style 4 Standees per sheet)
   const [paperFormat, setPaperFormat] = useState('a4-4-medium');
+  const [pdfPageOrientation, setPdfPageOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
   const [customWidthMm, setCustomWidthMm] = useState(210);
   const [customHeightMm, setCustomHeightMm] = useState(297);
   const [customCols, setCustomCols] = useState(2);
@@ -160,7 +178,8 @@ export default function QRGenerator() {
   const [templateMode, setTemplateMode] = useState('mascot-chef');
   const [customBgDataUrl, setCustomBgDataUrl] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['mascot-chef']?.bg || './assets/jarro_mascot_chef_qr_template.jpg';
+    const bgUrl = saved['mascot-chef']?.bg || DEFAULT_TEMPLATE_PRESETS['mascot-chef'].bg;
+    return getAssetPath(bgUrl);
   });
   const [qrSizePercent, setQrSizePercent] = useState(() => {
     const saved = loadSavedCoords();
