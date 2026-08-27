@@ -138,6 +138,63 @@ const urlToBase64 = async (url) => {
 
 
 
+// Helper to render full composite sticker card PNG (Template BG + QR Code Overlay + Token Text)
+const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct, showToken) => {
+  if (!bgUrl) return item.dataUrl;
+  try {
+    const bgBase64 = await urlToBase64(bgUrl);
+    if (!bgBase64) return item.dataUrl;
+
+    const bgImg = new Image();
+    await new Promise((resolve, reject) => {
+      bgImg.onload = resolve;
+      bgImg.onerror = reject;
+      bgImg.src = bgBase64;
+    });
+
+    const canvas = document.createElement('canvas');
+    const width = bgImg.naturalWidth || 1200;
+    const height = bgImg.naturalHeight || 1600;
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    // 1. Draw Template Background Image
+    ctx.drawImage(bgImg, 0, 0, width, height);
+
+    // 2. Draw QR Code PNG Overlay
+    const qrImg = new Image();
+    await new Promise((resolve, reject) => {
+      qrImg.onload = resolve;
+      qrImg.onerror = reject;
+      qrImg.src = item.dataUrl;
+    });
+
+    const qrW = width * (qrSizePct / 100);
+    const qrH = qrW;
+    const qrX = width * (qrXPct / 100);
+    const qrY = height * (qrYPct / 100);
+
+    ctx.drawImage(qrImg, qrX, qrY, qrW, qrH);
+
+    // 3. Optional Token Text
+    if (showToken) {
+      ctx.fillStyle = '#1e293b';
+      ctx.font = `bold ${Math.round(height * 0.022)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`ID: ${item.token.substring(0, 10)}`, width / 2, height - height * 0.015);
+    }
+
+    return canvas.toDataURL('image/png', 0.95);
+  } catch (err) {
+    console.error('Failed to render composite sticker card:', err);
+    return item.dataUrl;
+  }
+};
+
+
+
+
 const getAssetPath = (filename) => {
   if (!filename) return null;
   if (filename.startsWith('data:') || filename.startsWith('http://') || filename.startsWith('https://')) {
@@ -288,31 +345,33 @@ export default function QRGenerator() {
   // Paper & Sheet Layout State (Default: PhonePe/GPay Style 4 Standees per sheet)
   const [paperFormat, setPaperFormat] = useState('a4-4-medium');
   const [pdfPageOrientation, setPdfPageOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
-  const [customWidthMm, setCustomWidthMm] = useState(210);
-  const [customHeightMm, setCustomHeightMm] = useState(297);
-  const [customCols, setCustomCols] = useState(2);
-  const [customRows, setCustomRows] = useState(2);
+  const [dimensionUnit, setDimensionUnit] = useState('in'); // 'in' (Inches) or 'mm' (Millimeters)
+  const [customWidthVal, setCustomWidthVal] = useState(12);
+  const [customHeightVal, setCustomHeightVal] = useState(18);
+  const [customCols, setCustomCols] = useState(3);
+  const [customRows, setCustomRows] = useState(4);
 
   // Custom Physical Card Dimensions & Aspect Ratio Lock State
   const [lockAspect, setLockAspect] = useState(true);
-  const [cardWidthMm, setCardWidthMm] = useState(95);
-  const [cardHeightMm, setCardHeightMm] = useState(126.6);
+  const [cardWidthVal, setCardWidthVal] = useState(3.5);
+  const [cardHeightVal, setCardHeightVal] = useState(4.66);
 
   const handleCardWidthChange = (val) => {
-    setCardWidthMm(val);
+    setCardWidthVal(val);
     const w = parseFloat(val);
     if (lockAspect && !isNaN(w) && w > 0) {
-      setCardHeightMm((w * (4 / 3)).toFixed(1));
+      setCardHeightVal((w * (4 / 3)).toFixed(2));
     }
   };
 
   const handleCardHeightChange = (val) => {
-    setCardHeightMm(val);
+    setCardHeightVal(val);
     const h = parseFloat(val);
     if (lockAspect && !isNaN(h) && h > 0) {
-      setCardWidthMm((h * (3 / 4)).toFixed(1));
+      setCardWidthVal((h * (3 / 4)).toFixed(2));
     }
   };
+
 
   // Custom Sticker Design Template State & Saved Coords
   const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
@@ -655,6 +714,11 @@ export default function QRGenerator() {
         orientation = 'portrait';
         cols = 4;
         rows = 5;
+      } else if (paperFormat === '12x18-inch') {
+        pdfFormat = [304.8, 457.2]; // 12" x 18" in mm
+        orientation = 'portrait';
+        cols = 3;
+        rows = 4;
       } else if (paperFormat === '20x12-inch') {
         pdfFormat = [508, 304.8]; // 20" x 12" in mm
         orientation = 'landscape';
@@ -666,15 +730,21 @@ export default function QRGenerator() {
         cols = 4;
         rows = 6;
       } else if (paperFormat === 'custom') {
-        const pageW = parseFloat(customWidthMm) || 210;
-        const pageH = parseFloat(customHeightMm) || 297;
+        const unitMultiplier = dimensionUnit === 'in' ? 25.4 : 1;
+        const rawW = parseFloat(customWidthVal);
+        const rawH = parseFloat(customHeightVal);
+        const pageW = (!isNaN(rawW) && rawW > 0 ? rawW : (dimensionUnit === 'in' ? 12 : 304.8)) * unitMultiplier;
+        const pageH = (!isNaN(rawH) && rawH > 0 ? rawH : (dimensionUnit === 'in' ? 18 : 457.2)) * unitMultiplier;
+
         pdfFormat = [pageW, pageH];
         orientation = pageW >= pageH ? 'landscape' : 'portrait';
 
-        const reqCardW = parseFloat(cardWidthMm);
-        const reqCardH = parseFloat(cardHeightMm);
+        const rawCardW = parseFloat(cardWidthVal);
+        const rawCardH = parseFloat(cardHeightVal);
 
-        if (!isNaN(reqCardW) && reqCardW > 0 && !isNaN(reqCardH) && reqCardH > 0) {
+        if (!isNaN(rawCardW) && rawCardW > 0 && !isNaN(rawCardH) && rawCardH > 0) {
+          const reqCardW = rawCardW * unitMultiplier;
+          const reqCardH = rawCardH * unitMultiplier;
           cols = Math.max(1, Math.floor((pageW - 10) / reqCardW));
           rows = Math.max(1, Math.floor((pageH - 10) / reqCardH));
         } else {
@@ -753,7 +823,6 @@ export default function QRGenerator() {
           // Draw Custom Background Image for Sticker (Zero Distortion)
           doc.addImage(bgBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight, undefined, 'FAST');
 
-
           // Position QR Code based on custom position sliders (%) - Exact 1:1 match with Web Preview
           const qrWidth = drawWidth * (qrSizePercent / 100);
           const qrHeight = qrWidth; // Square QR Code
@@ -770,6 +839,8 @@ export default function QRGenerator() {
           }
         } else {
           // Default Jarro Card Template
+          const cardWidth = cellWidth - 3;
+          const cardHeight = cellHeight - 3;
           doc.setDrawColor(210, 220, 235);
           doc.setLineWidth(0.3);
           doc.roundedRect(x + 1.5, y + 1.5, cardWidth, cardHeight, 2, 2, 'S');
@@ -808,7 +879,7 @@ export default function QRGenerator() {
     }
   };
 
-  // Export ZIP Archive of PNG Images
+  // Export ZIP Archive of PNG Images (Full Composite Standee Designs)
   const handleExportZIP = async () => {
     if (qrItems.length === 0) return;
     try {
@@ -820,20 +891,33 @@ export default function QRGenerator() {
 
       for (let i = 0; i < qrItems.length; i++) {
         const item = qrItems[i];
-        const base64Data = item.dataUrl.replace(/^data:image\/png;base64,/, '');
-        const filename = `table_qr_${String(item.index).padStart(3, '0')}_${item.token.substring(0, 8)}.png`;
+        const compositeDataUrl = customBgDataUrl
+          ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText)
+          : item.dataUrl;
+
+        const base64Data = compositeDataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
+        const filename = `jarro_standee_${String(item.index).padStart(3, '0')}_${item.token.substring(0, 8)}.png`;
         folder.file(filename, base64Data, { base64: true });
         setExportProgress(Math.round(((i + 1) / qrItems.length) * 100));
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `Jarro_QR_Images_${qrItems.length}_${activeEnv.toUpperCase()}.zip`);
+      saveAs(content, `Jarro_QR_Sticker_Images_${qrItems.length}_${activeEnv.toUpperCase()}.zip`);
     } catch (err) {
       console.error('ZIP Export Error:', err);
     } finally {
       setExporting(false);
     }
   };
+
+  const handleDownloadSinglePNG = async (item) => {
+    if (!item) return;
+    const compositeDataUrl = customBgDataUrl
+      ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText)
+      : item.dataUrl;
+    saveAs(compositeDataUrl, `jarro_standee_${item.token.substring(0, 8)}.png`);
+  };
+
 
   // Export CSV File
   const handleExportCSV = () => {
@@ -1208,6 +1292,7 @@ export default function QRGenerator() {
                   label="Paper Sheet Size & Layout"
                   onChange={(e) => setPaperFormat(e.target.value)}
                 >
+                  <MenuItem value="12x18-inch">🖨️ Large Printing Sheet (12" x 18" Inches - 12 Standees / Sheet, 3x4 Grid)</MenuItem>
                   <MenuItem value="a4-4-medium">📱 PhonePe / GPay Style Standee (A4 - 4 Big Standees / Sheet, 2x2 Grid)</MenuItem>
                   <MenuItem value="a4-2-large">🏆 PhonePe / GPay Jumbo Standee (A4 - 2 Extra Large Standees / Sheet, 2x1 Grid)</MenuItem>
                   <MenuItem value="a4-1-full">📜 Full Page Table Standee (A4 - 1 Massive Standee / Page, 1x1 Grid)</MenuItem>
@@ -1216,7 +1301,7 @@ export default function QRGenerator() {
                   <MenuItem value="a4-20">🏷️ High-Density Stickers (A4 - 20 Stickers / Sheet, 4x5 Grid)</MenuItem>
                   <MenuItem value="20x12-inch">🏷️ Large Vinyl Sheet (20" x 12" - 32 Stickers / Sheet)</MenuItem>
                   <MenuItem value="a3-24">📜 Large A3 Sheet (24 Stickers / Sheet - 4x6 Grid)</MenuItem>
-                  <MenuItem value="custom">⚙️ Custom Physical Card Size & Grid (With 3:4 Aspect Lock)</MenuItem>
+                  <MenuItem value="custom">⚙️ Custom Physical Card Size & Sheet Dimensions (Inches / mm)</MenuItem>
                 </Select>
               </FormControl>
 
@@ -1234,20 +1319,44 @@ export default function QRGenerator() {
                 </Select>
               </FormControl>
 
-              {/* Custom Physical Card Dimension Inputs */}
+              {/* Custom Physical Card & Sheet Dimension Inputs */}
               {paperFormat === 'custom' && (
                 <Box sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-                  <Typography variant="caption" fontWeight={700} color="primary" sx={{ mb: 1, display: 'block' }}>
-                    📐 Physical Card Size (Standee / Sticker Dimensions):
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Typography variant="caption" fontWeight={700} color="primary">
+                      📐 Measurement Unit:
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Button
+                        size="small"
+                        variant={dimensionUnit === 'in' ? 'contained' : 'outlined'}
+                        onClick={() => setDimensionUnit('in')}
+                        sx={{ py: 0.2, px: 1, minWidth: 0, fontSize: '0.7rem', fontWeight: 700 }}
+                      >
+                        Inches (in)
+                      </Button>
+                      <Button
+                        size="small"
+                        variant={dimensionUnit === 'mm' ? 'contained' : 'outlined'}
+                        onClick={() => setDimensionUnit('mm')}
+                        sx={{ py: 0.2, px: 1, minWidth: 0, fontSize: '0.7rem', fontWeight: 700 }}
+                      >
+                        Millimeters (mm)
+                      </Button>
+                    </Box>
+                  </Box>
+
+                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    Standee Card Dimensions ({dimensionUnit}):
                   </Typography>
                   <Grid container spacing={1} sx={{ mb: 1 }}>
                     <Grid item xs={6}>
                       <TextField
                         fullWidth
                         size="small"
-                        label="Card Width (mm)"
+                        label={`Card Width (${dimensionUnit})`}
                         type="number"
-                        value={cardWidthMm}
+                        value={cardWidthVal}
                         onChange={(e) => handleCardWidthChange(e.target.value)}
                       />
                     </Grid>
@@ -1255,9 +1364,9 @@ export default function QRGenerator() {
                       <TextField
                         fullWidth
                         size="small"
-                        label="Card Height (mm)"
+                        label={`Card Height (${dimensionUnit})`}
                         type="number"
-                        value={cardHeightMm}
+                        value={cardHeightVal}
                         onChange={(e) => handleCardHeightChange(e.target.value)}
                       />
                     </Grid>
@@ -1270,8 +1379,8 @@ export default function QRGenerator() {
                         checked={lockAspect}
                         onChange={(e) => {
                           setLockAspect(e.target.checked);
-                          if (e.target.checked && cardWidthMm > 0) {
-                            setCardHeightMm((parseFloat(cardWidthMm) * (4 / 3)).toFixed(1));
+                          if (e.target.checked && cardWidthVal > 0) {
+                            setCardHeightVal((parseFloat(cardWidthVal) * (4 / 3)).toFixed(2));
                           }
                         }}
                       />
@@ -1282,32 +1391,33 @@ export default function QRGenerator() {
                   <Divider sx={{ my: 1.5 }} />
 
                   <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                    📄 Sheet Dimensions (mm):
+                    📄 Full Paper Sheet Dimensions ({dimensionUnit}):
                   </Typography>
                   <Grid container spacing={1} sx={{ mb: 1 }}>
                     <Grid item xs={6}>
                       <TextField
                         fullWidth
                         size="small"
-                        label="Sheet Width (mm)"
+                        label={`Sheet Width (${dimensionUnit})`}
                         type="number"
-                        value={customWidthMm}
-                        onChange={(e) => setCustomWidthMm(e.target.value)}
+                        value={customWidthVal}
+                        onChange={(e) => setCustomWidthVal(e.target.value)}
                       />
                     </Grid>
                     <Grid item xs={6}>
                       <TextField
                         fullWidth
                         size="small"
-                        label="Sheet Height (mm)"
+                        label={`Sheet Height (${dimensionUnit})`}
                         type="number"
-                        value={customHeightMm}
-                        onChange={(e) => setCustomHeightMm(e.target.value)}
+                        value={customHeightVal}
+                        onChange={(e) => setCustomHeightVal(e.target.value)}
                       />
                     </Grid>
                   </Grid>
                 </Box>
               )}
+
 
               {exporting && (
                 <Box sx={{ mb: 2, textAlign: 'center' }}>
@@ -1490,16 +1600,28 @@ export default function QRGenerator() {
                             {qrItems[0].token}
                           </Typography>
                         </Box>
-                        <Tooltip title="Copy Target Scan Link">
+                        <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button
                             size="small"
-                            variant="outlined"
-                            startIcon={<CopyIcon />}
-                            onClick={() => copyToClipboard(qrItems[0].fullUrl)}
+                            variant="contained"
+                            color="primary"
+                            startIcon={<UploadIcon sx={{ transform: 'rotate(180deg)' }} />}
+                            onClick={() => handleDownloadSinglePNG(qrItems[0])}
                           >
-                            Copy Scan Link
+                            Download Standee PNG
                           </Button>
-                        </Tooltip>
+                          <Tooltip title="Copy Target Scan Link">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<CopyIcon />}
+                              onClick={() => copyToClipboard(qrItems[0].fullUrl)}
+                            >
+                              Copy Scan Link
+                            </Button>
+                          </Tooltip>
+                        </Box>
+
                       </Box>
                     </Box>
                   ) : (
