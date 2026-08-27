@@ -102,6 +102,7 @@ const getAssetPath = (filename) => {
 };
 
 const DEFAULT_TEMPLATE_PRESETS = {
+  'jaaro-bilingual-menu': { bg: getAssetPath('jaaro_digital_menu_qr_template.jpg'), size: 51, x: 41, y: 35 },
   'mascot-chef': { bg: getAssetPath('jarro_mascot_chef_qr_template.jpg'), size: 48, x: 37, y: 30 },
   'mascot-fox': { bg: getAssetPath('jarro_mascot_fox_qr_template.jpg'), size: 44, x: 48, y: 36 },
   'mascot-rocket': { bg: getAssetPath('jarro_mascot_rocket_qr_template.jpg'), size: 42, x: 46, y: 35 },
@@ -109,6 +110,7 @@ const DEFAULT_TEMPLATE_PRESETS = {
   'vsafe-template': { bg: getAssetPath('jarro_vsafe_qr_sticker_template.jpg'), size: 53, x: 24, y: 34 },
   'custom-bg': { bg: null, size: 45, x: 27.5, y: 25 },
 };
+
 
 const loadSavedCoords = () => {
   try {
@@ -175,24 +177,25 @@ export default function QRGenerator() {
 
   // Custom Sticker Design Template State & Saved Coords
   const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
-  const [templateMode, setTemplateMode] = useState('mascot-chef');
+  const [templateMode, setTemplateMode] = useState('jaaro-bilingual-menu');
   const [customBgDataUrl, setCustomBgDataUrl] = useState(() => {
     const saved = loadSavedCoords();
-    const bgUrl = saved['mascot-chef']?.bg || DEFAULT_TEMPLATE_PRESETS['mascot-chef'].bg;
+    const bgUrl = saved['jaaro-bilingual-menu']?.bg || DEFAULT_TEMPLATE_PRESETS['jaaro-bilingual-menu'].bg;
     return getAssetPath(bgUrl);
   });
   const [qrSizePercent, setQrSizePercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['mascot-chef']?.size ?? 48;
+    return saved['jaaro-bilingual-menu']?.size ?? 51;
   });
   const [qrXPercent, setQrXPercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['mascot-chef']?.x ?? 37;
+    return saved['jaaro-bilingual-menu']?.x ?? 41;
   });
   const [qrYPercent, setQrYPercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['mascot-chef']?.y ?? 30;
+    return saved['jaaro-bilingual-menu']?.y ?? 35;
   });
+
   const [showTokenText, setShowTokenText] = useState(false);
   const [transparentBg, setTransparentBg] = useState(true);
 
@@ -851,6 +854,7 @@ export default function QRGenerator() {
                   label="Card Design Template"
                   onChange={(e) => handleSelectTemplate(e.target.value)}
                 >
+                  <MenuItem value="jaaro-bilingual-menu">🇮🇳 📜 Official JAARO Bilingual Digital Menu (Hindi & English)</MenuItem>
                   <MenuItem value="mascot-chef">👨‍🍳 Mascot 1: Chef JARRo (Dark Navy & Gold)</MenuItem>
                   <MenuItem value="mascot-fox">🦊 Mascot 2: Red Panda Foodie (Warm Amber & Charcoal)</MenuItem>
                   <MenuItem value="mascot-rocket">⚡ Mascot 3: Superhero Express (Neon Blue & Cyan)</MenuItem>
@@ -861,7 +865,8 @@ export default function QRGenerator() {
                 </Select>
               </FormControl>
 
-              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && (
+              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-') || templateMode.startsWith('jaaro-')) && (
+
                 <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
                   {templateMode === 'custom-bg' && (
                     <Button variant="outlined" component="label" fullWidth startIcon={<UploadIcon />} sx={{ mb: 2 }}>
