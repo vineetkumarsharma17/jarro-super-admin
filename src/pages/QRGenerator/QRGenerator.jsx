@@ -100,34 +100,42 @@ const getImageDimensions = (url) => {
   });
 };
 
-// Helper to convert image URL to base64 Data URL for jsPDF export
-const urlToBase64 = (url) => {
-  return new Promise((resolve) => {
-    if (!url) return resolve(null);
-    if (url.startsWith('data:')) return resolve(url);
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const dataURL = canvas.toDataURL('image/jpeg', 0.95);
-        resolve(dataURL);
-      } catch (err) {
-        console.error('Failed to convert URL to Base64:', err);
-        resolve(url);
-      }
-    };
-    img.onerror = (err) => {
-      console.error('Image load error for Base64 conversion:', err);
-      resolve(url);
-    };
-    img.src = url;
-  });
+// Helper to convert image URL to base64 Data URL for jsPDF export (CORS & same-origin safe)
+const urlToBase64 = async (url) => {
+  if (!url) return null;
+  if (url.startsWith('data:')) return url;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.error('Fetch urlToBase64 failed, falling back to Image element:', err);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.95));
+        } catch (e) {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
 };
+
 
 
 const getAssetPath = (filename) => {
