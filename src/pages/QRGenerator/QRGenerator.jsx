@@ -100,6 +100,36 @@ const getImageDimensions = (url) => {
   });
 };
 
+// Helper to convert image URL to base64 Data URL for jsPDF export
+const urlToBase64 = (url) => {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    if (url.startsWith('data:')) return resolve(url);
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+        resolve(dataURL);
+      } catch (err) {
+        console.error('Failed to convert URL to Base64:', err);
+        resolve(url);
+      }
+    };
+    img.onerror = (err) => {
+      console.error('Image load error for Base64 conversion:', err);
+      resolve(url);
+    };
+    img.src = url;
+  });
+};
+
+
 const getAssetPath = (filename) => {
   if (!filename) return null;
   if (filename.startsWith('data:') || filename.startsWith('http://') || filename.startsWith('https://')) {
@@ -672,6 +702,9 @@ export default function QRGenerator() {
       const cellWidth = (pageWidth - margin * 2) / cols;
       const cellHeight = (pageHeight - margin * 2) / rows;
 
+      // Convert custom background image URL to Base64 Data URL for jsPDF
+      const bgBase64 = customBgDataUrl ? await urlToBase64(customBgDataUrl) : null;
+
       // Measure true native aspect ratio of template image
       let nativeAspect = 3 / 4;
       if (customBgDataUrl) {
@@ -695,7 +728,7 @@ export default function QRGenerator() {
         const x = margin + col * cellWidth;
         const y = margin + row * cellHeight;
 
-        if ((templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-')) && customBgDataUrl) {
+        if (bgBase64) {
           // Maintain 100% native aspect ratio of the sticker card template with ZERO stretching
           let drawWidth = cellWidth - 2;
           let drawHeight = drawWidth / nativeAspect;
@@ -710,7 +743,8 @@ export default function QRGenerator() {
           const drawY = y + (cellHeight - drawHeight) / 2;
 
           // Draw Custom Background Image for Sticker (Zero Distortion)
-          doc.addImage(customBgDataUrl, 'JPEG', drawX, drawY, drawWidth, drawHeight, undefined, 'FAST');
+          doc.addImage(bgBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight, undefined, 'FAST');
+
 
           // Position QR Code based on custom position sliders (%) - Exact 1:1 match with Web Preview
           const qrWidth = drawWidth * (qrSizePercent / 100);
