@@ -8,6 +8,8 @@ import {
   TextField,
   Card,
   CardContent,
+  CardActionArea,
+  CardMedia,
   Chip,
   Tabs,
   Tab,
@@ -30,6 +32,10 @@ import {
   Switch,
   FormControlLabel,
   Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   QrCode2 as QrCodeIcon,
@@ -42,7 +48,12 @@ import {
   ContentCopy as CopyIcon,
   AutoAwesome as MagicIcon,
   Refresh as RefreshIcon,
+  Collections as GalleryIcon,
+  Delete as DeleteIcon,
+  Restore as RestoreIcon,
+  AddPhotoAlternate as AddPhotoIcon,
 } from '@mui/icons-material';
+
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -102,14 +113,104 @@ const getAssetPath = (filename) => {
 };
 
 const DEFAULT_TEMPLATE_PRESETS = {
-  'jaaro-bilingual-menu': { bg: getAssetPath('jaaro_digital_menu_qr_template.jpg'), size: 51, x: 41, y: 35 },
-  'mascot-chef': { bg: getAssetPath('jarro_mascot_chef_qr_template.jpg'), size: 48, x: 37, y: 30 },
-  'mascot-fox': { bg: getAssetPath('jarro_mascot_fox_qr_template.jpg'), size: 44, x: 48, y: 36 },
-  'mascot-rocket': { bg: getAssetPath('jarro_mascot_rocket_qr_template.jpg'), size: 42, x: 46, y: 35 },
-  'mascot-food-buddy': { bg: getAssetPath('jarro_mascot_food_buddy_qr_template.jpg'), size: 48, x: 41, y: 28 },
-  'vsafe-template': { bg: getAssetPath('jarro_vsafe_qr_sticker_template.jpg'), size: 53, x: 24, y: 34 },
-  'custom-bg': { bg: null, size: 45, x: 27.5, y: 25 },
+  'jarro-official-whatsapp': {
+    id: 'jarro-official-whatsapp',
+    title: 'JARRo WhatsApp & Digital Menu',
+    subtitle: 'Official Bilingual Standee with WhatsApp Bill Callout',
+    badge: '★ OFFICIAL RECOMMENDED',
+    badgeColor: 'success',
+    bg: getAssetPath('jarro_official_whatsapp_qr_template.jpg'),
+    size: 47,
+    x: 41,
+    y: 39,
+    isDeletable: true,
+  },
+  'jaaro-bilingual-menu': {
+    id: 'jaaro-bilingual-menu',
+    title: 'JAARO Digital Menu Standee',
+    subtitle: 'Bilingual (Hindi & English) Digital Menu Standee',
+    badge: 'BILINGUAL',
+    badgeColor: 'warning',
+    bg: getAssetPath('jaaro_digital_menu_qr_template.jpg'),
+    size: 51,
+    x: 41,
+    y: 35,
+    isDeletable: true,
+  },
+  'mascot-chef': {
+    id: 'mascot-chef',
+    title: 'Chef JARRo Standee',
+    subtitle: 'Dark Navy & Gold 3D Chef Standee',
+    badge: 'POPULAR',
+    badgeColor: 'info',
+    bg: getAssetPath('jarro_mascot_chef_qr_template.jpg'),
+    size: 48,
+    x: 37,
+    y: 30,
+    isDeletable: true,
+  },
+  'mascot-fox': {
+    id: 'mascot-fox',
+    title: 'Red Panda Foodie',
+    subtitle: 'Warm Amber & Charcoal Standee',
+    badge: 'AMBER',
+    badgeColor: 'secondary',
+    bg: getAssetPath('jarro_mascot_fox_qr_template.jpg'),
+    size: 44,
+    x: 48,
+    y: 36,
+    isDeletable: true,
+  },
+  'mascot-rocket': {
+    id: 'mascot-rocket',
+    title: 'Superhero Express',
+    subtitle: 'Neon Blue & Cyan Standee',
+    badge: 'EXPRESS',
+    badgeColor: 'primary',
+    bg: getAssetPath('jarro_mascot_rocket_qr_template.jpg'),
+    size: 42,
+    x: 46,
+    y: 35,
+    isDeletable: true,
+  },
+  'mascot-food-buddy': {
+    id: 'mascot-food-buddy',
+    title: 'Pizza & Noodle Buddies',
+    subtitle: 'Crimson Bistro Standee',
+    badge: 'BISTRO',
+    badgeColor: 'error',
+    bg: getAssetPath('jarro_mascot_food_buddy_qr_template.jpg'),
+    size: 48,
+    x: 41,
+    y: 28,
+    isDeletable: true,
+  },
+  'vsafe-template': {
+    id: 'vsafe-template',
+    title: 'JARRo Classic Gold Card',
+    subtitle: 'Clean Minimal Gold Bordered Table Sticker',
+    badge: 'CLASSIC',
+    badgeColor: 'default',
+    bg: getAssetPath('jarro_vsafe_qr_sticker_template.jpg'),
+    size: 53,
+    x: 24,
+    y: 34,
+    isDeletable: true,
+  },
+  'custom-bg': {
+    id: 'custom-bg',
+    title: 'Upload Custom Design',
+    subtitle: 'Upload your own custom image or design template',
+    badge: 'CUSTOM',
+    badgeColor: 'primary',
+    bg: null,
+    size: 45,
+    x: 27.5,
+    y: 25,
+    isDeletable: false,
+  },
 };
+
 
 
 const loadSavedCoords = () => {
@@ -177,24 +278,58 @@ export default function QRGenerator() {
 
   // Custom Sticker Design Template State & Saved Coords
   const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
-  const [templateMode, setTemplateMode] = useState('jaaro-bilingual-menu');
+  const [templateMode, setTemplateMode] = useState('jarro-official-whatsapp');
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [deletedTemplateIds, setDeletedTemplateIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('jarro_deleted_templates');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [customBgDataUrl, setCustomBgDataUrl] = useState(() => {
     const saved = loadSavedCoords();
-    const bgUrl = saved['jaaro-bilingual-menu']?.bg || DEFAULT_TEMPLATE_PRESETS['jaaro-bilingual-menu'].bg;
+    const bgUrl = saved['jarro-official-whatsapp']?.bg || DEFAULT_TEMPLATE_PRESETS['jarro-official-whatsapp'].bg;
     return getAssetPath(bgUrl);
   });
   const [qrSizePercent, setQrSizePercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['jaaro-bilingual-menu']?.size ?? 51;
+    return saved['jarro-official-whatsapp']?.size ?? 47;
   });
   const [qrXPercent, setQrXPercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['jaaro-bilingual-menu']?.x ?? 41;
+    return saved['jarro-official-whatsapp']?.x ?? 41;
   });
   const [qrYPercent, setQrYPercent] = useState(() => {
     const saved = loadSavedCoords();
-    return saved['jaaro-bilingual-menu']?.y ?? 35;
+    return saved['jarro-official-whatsapp']?.y ?? 39;
   });
+
+  const handleDeleteTemplate = (templateId, e) => {
+    if (e) e.stopPropagation();
+    const updatedDeleted = [...deletedTemplateIds, templateId];
+    setDeletedTemplateIds(updatedDeleted);
+    try {
+      localStorage.setItem('jarro_deleted_templates', JSON.stringify(updatedDeleted));
+    } catch (err) {
+      console.error('Failed to save deleted templates:', err);
+    }
+    if (templateMode === templateId) {
+      handleSelectTemplate('jarro-official-whatsapp');
+    }
+  };
+
+  const handleRestoreTemplates = () => {
+    setDeletedTemplateIds([]);
+    try {
+      localStorage.removeItem('jarro_deleted_templates');
+    } catch (err) {
+      console.error('Failed to clear deleted templates:', err);
+    }
+  };
+
 
   const [showTokenText, setShowTokenText] = useState(false);
   const [transparentBg, setTransparentBg] = useState(true);
@@ -847,25 +982,84 @@ export default function QRGenerator() {
                 Sticker Card Design & QR Positioning
               </Typography>
 
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>Card Design Template</InputLabel>
-                <Select
-                  value={templateMode}
-                  label="Card Design Template"
-                  onChange={(e) => handleSelectTemplate(e.target.value)}
-                >
-                  <MenuItem value="jaaro-bilingual-menu">🇮🇳 📜 Official JAARO Bilingual Digital Menu (Hindi & English)</MenuItem>
-                  <MenuItem value="mascot-chef">👨‍🍳 Mascot 1: Chef JARRo (Dark Navy & Gold)</MenuItem>
-                  <MenuItem value="mascot-fox">🦊 Mascot 2: Red Panda Foodie (Warm Amber & Charcoal)</MenuItem>
-                  <MenuItem value="mascot-rocket">⚡ Mascot 3: Superhero Express (Neon Blue & Cyan)</MenuItem>
-                  <MenuItem value="mascot-food-buddy">🍕 Mascot 4: Pizza & Noodle Buddies (Crimson Bistro)</MenuItem>
-                  <MenuItem value="vsafe-template">🌟 Official JARRo Classic Gold Card</MenuItem>
-                  <MenuItem value="default">🎨 Default Jarro Simple Card</MenuItem>
-                  <MenuItem value="custom-bg">🖼️ Upload Custom Background Image Design</MenuItem>
-                </Select>
-              </FormControl>
+              {/* Active Selected Template Preview Card with Gallery Button */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  mb: 2.5,
+                  borderRadius: 2.5,
+                  bgcolor: 'background.paper',
+                  border: '1.5px solid #e2e8f0',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 60,
+                      height: 80,
+                      borderRadius: 1.5,
+                      overflow: 'hidden',
+                      border: '1px solid #cbd5e1',
+                      bgcolor: '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {customBgDataUrl ? (
+                      <img
+                        src={customBgDataUrl}
+                        alt="Selected Template"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <AddPhotoIcon color="action" />
+                    )}
+                  </Box>
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                      <Typography variant="subtitle2" fontWeight={700} noWrap>
+                        {DEFAULT_TEMPLATE_PRESETS[templateMode]?.title || 'Selected Design'}
+                      </Typography>
+                      {DEFAULT_TEMPLATE_PRESETS[templateMode]?.badge && (
+                        <Chip
+                          label={DEFAULT_TEMPLATE_PRESETS[templateMode].badge}
+                          color={DEFAULT_TEMPLATE_PRESETS[templateMode].badgeColor || 'default'}
+                          size="small"
+                          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
+                        />
+                      )}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                      {DEFAULT_TEMPLATE_PRESETS[templateMode]?.subtitle || 'Custom card template design'}
+                    </Typography>
+                  </Box>
+                </Box>
 
-              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-') || templateMode.startsWith('jaaro-')) && (
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<GalleryIcon />}
+                  onClick={() => setGalleryOpen(true)}
+                  sx={{
+                    py: 1,
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
+                    },
+                  }}
+                >
+                  🖼️ Browse Template Gallery
+                </Button>
+              </Paper>
+
+              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-') || templateMode.startsWith('jaaro-') || templateMode.startsWith('jarro-')) && (
+
 
                 <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
                   {templateMode === 'custom-bg' && (
@@ -1477,6 +1671,207 @@ export default function QRGenerator() {
           </Grid>
         </Paper>
       )}
+
+      {/* Template Gallery Picker Modal Dialog */}
+      <Dialog
+        open={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 1 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+          <Box>
+            <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <GalleryIcon color="primary" /> Select Table QR Design Template
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Choose from official JARRo bilingual standees or upload your custom background.
+            </Typography>
+          </Box>
+          {deletedTemplateIds.length > 0 && (
+            <Button
+              size="small"
+              startIcon={<RestoreIcon />}
+              onClick={handleRestoreTemplates}
+              color="secondary"
+              variant="outlined"
+            >
+              Restore ({deletedTemplateIds.length}) Deleted
+            </Button>
+          )}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2}>
+            {Object.values(DEFAULT_TEMPLATE_PRESETS)
+              .filter((preset) => !deletedTemplateIds.includes(preset.id))
+              .map((preset) => {
+                const isSelected = templateMode === preset.id;
+                const bgImage = preset.id === 'custom-bg' ? customBgDataUrl : preset.bg;
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={preset.id}>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderRadius: 2.5,
+                        transition: 'all 0.2s ease-in-out',
+                        position: 'relative',
+                        border: isSelected ? '2.5px solid #2563eb' : '1px solid #e2e8f0',
+                        boxShadow: isSelected ? '0 4px 16px rgba(37,99,235,0.3)' : '0 2px 6px rgba(0,0,0,0.04)',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        },
+                      }}
+                    >
+                      {/* Active Selection Badge */}
+                      {isSelected && (
+                        <Chip
+                          label="✓ SELECTED"
+                          color="primary"
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            zIndex: 3,
+                            fontWeight: 800,
+                            fontSize: '0.65rem',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                          }}
+                        />
+                      )}
+
+                      {/* Preset Badge */}
+                      {preset.badge && !isSelected && (
+                        <Chip
+                          label={preset.badge}
+                          color={preset.badgeColor || 'default'}
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            zIndex: 3,
+                            fontWeight: 700,
+                            fontSize: '0.65rem',
+                          }}
+                        />
+                      )}
+
+                      {/* Delete Button */}
+                      {preset.isDeletable && (
+                        <Tooltip title="Delete Template from Gallery">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleDeleteTemplate(preset.id, e)}
+                            sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              zIndex: 4,
+                              bgcolor: 'rgba(255, 255, 255, 0.95)',
+                              color: 'error.main',
+                              '&:hover': { bgcolor: '#fee2e2' },
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+
+                      <CardActionArea
+                        onClick={() => {
+                          handleSelectTemplate(preset.id);
+                          setGalleryOpen(false);
+                        }}
+                        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                      >
+                        <Box
+                          sx={{
+                            height: 190,
+                            bgcolor: '#f8fafc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            position: 'relative',
+                          }}
+                        >
+                          {bgImage ? (
+                            <CardMedia
+                              component="img"
+                              image={bgImage}
+                              alt={preset.title}
+                              sx={{
+                                height: '100%',
+                                width: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          ) : (
+                            <Box sx={{ textAlign: 'center', p: 2 }}>
+                              <AddPhotoIcon sx={{ fontSize: 44, color: 'text.secondary', mb: 1 }} />
+                              <Typography variant="caption" display="block" fontWeight={600} color="text.secondary">
+                                Upload Custom Background
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        <CardContent sx={{ p: 2, flexGrow: 1 }}>
+                          <Typography variant="subtitle2" fontWeight={700} noWrap>
+                            {preset.title}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              lineHeight: 1.3,
+                              mt: 0.5,
+                            }}
+                          >
+                            {preset.subtitle}
+                          </Typography>
+                        </CardContent>
+                      </CardActionArea>
+                      <Box sx={{ p: 1.5, pt: 0 }}>
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant={isSelected ? 'contained' : 'outlined'}
+                          color={isSelected ? 'primary' : 'inherit'}
+                          onClick={() => {
+                            handleSelectTemplate(preset.id);
+                            setGalleryOpen(false);
+                          }}
+                          sx={{ borderRadius: 1.5, fontWeight: 700 }}
+                        >
+                          {isSelected ? 'Currently Selected' : 'Use Template'}
+                        </Button>
+                      </Box>
+                    </Card>
+                  </Grid>
+                );
+              })}
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button variant="contained" onClick={() => setGalleryOpen(false)}>
+            Close Gallery
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
+
