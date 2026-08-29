@@ -9,6 +9,8 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -29,6 +31,7 @@ export default function RestaurantCreate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [sameAsOwnerMobile, setSameAsOwnerMobile] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -53,10 +56,19 @@ export default function RestaurantCreate() {
   // Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Auto-sync restaurant phone if sameAsOwnerMobile is checked and owner mobile is modified
+      if (name === 'mobile' && sameAsOwnerMobile) {
+        updated.phone = value;
+      }
+      return updated;
+    });
+
+    if (name === 'phone') {
+      setSameAsOwnerMobile(false);
+    }
     
     // Clear error for this field when user starts typing
     if (formErrors[name]) {
@@ -64,6 +76,14 @@ export default function RestaurantCreate() {
         ...prev,
         [name]: '',
       }));
+    }
+  };
+
+  const handleSamePhoneToggle = (e) => {
+    const checked = e.target.checked;
+    setSameAsOwnerMobile(checked);
+    if (checked) {
+      setFormData((prev) => ({ ...prev, phone: prev.mobile }));
     }
   };
 
@@ -185,9 +205,14 @@ export default function RestaurantCreate() {
           )}
 
           {/* Owner/User Details Section */}
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            Owner Details
-          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Owner Account Details
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Personal credentials for the owner to log into the Jarro Manager App & Admin Portal
+            </Typography>
+          </Box>
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} md={6}>
               <FormInput
@@ -216,12 +241,12 @@ export default function RestaurantCreate() {
             </Grid>
             <Grid item xs={12} md={6}>
               <FormInput
-                label="Mobile Number"
+                label="Owner Mobile Number (Login)"
                 name="mobile"
                 value={formData.mobile}
                 onChange={handleChange}
                 error={!!formErrors.mobile}
-                helperText={formErrors.mobile}
+                helperText={formErrors.mobile || "Owner's 10-digit mobile number for OTP & Login"}
                 required
                 placeholder="1234567890"
               />
@@ -256,9 +281,14 @@ export default function RestaurantCreate() {
           <Divider sx={{ my: 3 }} />
 
           {/* Restaurant Details Section */}
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            Restaurant Details
-          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Restaurant Outlet Details
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Public outlet information displayed to diners on QR menus & customer receipts
+            </Typography>
+          </Box>
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12}>
               <FormInput
@@ -288,14 +318,30 @@ export default function RestaurantCreate() {
             </Grid>
             <Grid item xs={12} md={6}>
               <FormInput
-                label="Phone Number"
+                label="Restaurant Contact Phone Number"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
                 error={!!formErrors.phone}
-                helperText={formErrors.phone}
+                helperText={formErrors.phone || "Public outlet number printed on QR menus & bills"}
                 required
-                placeholder="+1 555-123-4567"
+                placeholder="e.g., 9876543210"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={sameAsOwnerMobile}
+                    onChange={handleSamePhoneToggle}
+                    size="small"
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="caption" color="text.secondary">
+                    Same as Owner Mobile Number
+                  </Typography>
+                }
+                sx={{ mt: 0.5 }}
               />
             </Grid>
             <Grid item xs={12} md={6}>

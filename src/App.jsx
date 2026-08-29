@@ -17,6 +17,8 @@ import Settings from './pages/Settings/Settings';
 import UserList from './pages/Users/UserList';
 import Analytics from './pages/Analytics/Analytics';
 import SystemMonitoring from './pages/Monitoring/SystemMonitoring';
+import QRGenerator from './pages/QRGenerator/QRGenerator';
+import PushNotifications from './pages/Notifications/PushNotifications';
 
 const theme = createTheme({
   palette: {
@@ -191,6 +193,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <DashboardLayout>
               <UserList />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/qr-generator"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <QRGenerator />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <PushNotifications />
             </DashboardLayout>
           </ProtectedRoute>
         }

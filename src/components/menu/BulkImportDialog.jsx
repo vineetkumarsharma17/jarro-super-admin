@@ -273,16 +273,16 @@ export default function BulkImportDialog({ open, onClose, restaurantId, onSucces
                   <input
                     type="file"
                     multiple
-                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, application/pdf, .pdf"
                     hidden
                     onChange={handleFileChange}
                   />
                   <CloudUpload sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600}>
-                    Click or Drag Menu Images Here
+                    Click or Drag Menu Images & PDFs Here
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Supports JPG, PNG, WEBP images. Upload multiple pages if needed.
+                    Supports JPG, PNG, WEBP images and PDF documents. Upload multiple pages if needed.
                   </Typography>
                 </Paper>
 

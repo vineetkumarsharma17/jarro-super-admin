@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
-
-// Socket connects to the API origin (VITE_API_URL without the trailing /api).
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const ORIGIN = API.replace(/\/api\/?$/, '');
+import { getActiveApiUrl } from '../services/api';
 
 const EMPTY = {
   onlineRestaurantIds: [],
@@ -32,7 +29,10 @@ export function PresenceProvider({ children }) {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socket = io(ORIGIN, {
+    const apiUrl = getActiveApiUrl();
+    const origin = apiUrl.replace(/\/api\/?$/, '');
+
+    const socket = io(origin, {
       query: { token, superAdmin: 'true' },
       transports: ['websocket', 'polling'],
     });
