@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import OnlinePresenceModal from './OnlinePresenceModal';
 
 import { getPublicSystemStatus } from '../../services/systemService';
 import { ENV_CONFIG, getActiveEnvKey, setActiveEnvKey } from '../../services/api';
@@ -97,6 +98,7 @@ export default function DashboardLayout({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  const [presenceModalOpen, setPresenceModalOpen] = useState(false);
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleLogout = () => logout();
 
@@ -197,8 +199,10 @@ export default function DashboardLayout({ children }) {
                 size="small"
                 label={`${totalDevices} online`}
                 variant="outlined"
+                onClick={() => setPresenceModalOpen(true)}
                 sx={{
                   fontWeight: 700,
+                  cursor: 'pointer',
                   borderColor: connected ? 'success.main' : 'divider',
                   color: connected ? 'success.main' : 'text.secondary',
                   '& .MuiChip-icon': { ml: 1 },
@@ -368,6 +372,7 @@ export default function DashboardLayout({ children }) {
         )}
         {children}
       </Box>
+      <OnlinePresenceModal open={presenceModalOpen} onClose={() => setPresenceModalOpen(false)} />
     </Box>
   );
 }
