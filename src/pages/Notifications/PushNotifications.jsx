@@ -20,6 +20,7 @@ import {
   Divider,
   Paper,
   IconButton,
+  Stack,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -33,8 +34,57 @@ import {
   Image as ImageIcon,
   TouchApp as ActionIcon,
   AltRoute as RouteIcon,
+  AutoAwesome as TemplateIcon,
 } from '@mui/icons-material';
 import api from '../../services/api';
+
+const TEMPLATES = [
+  {
+    label: '🚨 New Order Alert',
+    title: '🚨 New Order #1042 Received',
+    body: 'Table 4 ordered 2x Paneer Butter Masala & 3x Butter Naan.',
+    sound: 'order_chime',
+    screen: '/orders',
+    imageUrl: '',
+    target: 'role',
+    role: 'waiter',
+    actions: [
+      { id: 'accept_order', title: '✅ Accept Order' },
+      { id: 'view_order', title: '👁️ View Details' },
+    ],
+  },
+  {
+    label: '🎁 Rich Image Promo',
+    title: '🎉 20% Off Weekend Promotion',
+    body: 'Exclusive weekend promo activated for your restaurant menu items!',
+    sound: 'bell',
+    screen: '/menu',
+    imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600',
+    target: 'all',
+    actions: [{ id: 'view_promo', title: '🎁 Claim Offer' }],
+  },
+  {
+    label: '📢 System Notice',
+    title: '📢 Scheduled Server Upgrade',
+    body: 'Infrastructure optimization scheduled for 2:00 AM tonight (~15 mins delay).',
+    sound: 'default',
+    screen: '/',
+    imageUrl: '',
+    target: 'all',
+    actions: [{ id: 'dismiss', title: '👍 Got It' }],
+  },
+  {
+    label: '💳 Payment Verified',
+    title: '💳 Subscription Renewal Verified',
+    body: 'Your PRO Plan renewal of ₹1,499 was processed and verified successfully.',
+    sound: 'default',
+    screen: '/settings',
+    imageUrl: '',
+    target: 'role',
+    role: 'admin',
+    actions: [{ id: 'view_invoice', title: '📄 View Invoice' }],
+  },
+];
 
 export default function PushNotifications() {
   const [target, setTarget] = useState('all'); // 'all', 'role', 'restaurant'
@@ -69,6 +119,17 @@ export default function PushNotifications() {
     } catch (err) {
       console.error('Error fetching restaurants:', err);
     }
+  };
+
+  const applyTemplate = (t) => {
+    setTitle(t.title);
+    setBody(t.body);
+    setSound(t.sound);
+    setScreen(t.screen);
+    setImageUrl(t.imageUrl || '');
+    setTarget(t.target || 'all');
+    if (t.role) setRole(t.role);
+    setActions(t.actions || []);
   };
 
   const handleAddAction = () => {
@@ -135,6 +196,32 @@ export default function PushNotifications() {
           Broadcast rich push notifications with dynamic images, custom sound chimes, deep-link screen routing, and interactive action buttons — zero app updates required!
         </Typography>
       </Box>
+
+      {/* Quick Test Templates Row */}
+      <Card variant="outlined" sx={{ mb: 3, borderRadius: 3, bgcolor: '#f8fafc', border: '1px border #e2e8f0' }}>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+            <TemplateIcon color="primary" fontSize="small" /> Quick 1-Click Test Templates
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {TEMPLATES.map((t, i) => (
+              <Chip
+                key={i}
+                label={t.label}
+                onClick={() => applyTemplate(t)}
+                color="primary"
+                variant="outlined"
+                clickable
+                sx={{
+                  fontWeight: 700,
+                  bgcolor: 'white',
+                  '&:hover': { bgcolor: 'primary.50' },
+                }}
+              />
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
