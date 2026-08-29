@@ -32,6 +32,7 @@ import {
   RamenDining as BrandIcon,
   MonitorHeart as MonitorHeartIcon,
   QrCode2 as QrCodeIcon,
+  Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -47,6 +48,7 @@ const menuItems = [
   { text: 'Restaurants', icon: <RestaurantIcon />, path: '/restaurants' },
   { text: 'Users', icon: <PeopleIcon />, path: '/users' },
   { text: 'QR Generator', icon: <QrCodeIcon />, path: '/qr-generator' },
+  { text: 'Push Notifications', icon: <NotificationsIcon />, path: '/notifications' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: 'API Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
