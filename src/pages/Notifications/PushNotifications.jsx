@@ -50,7 +50,7 @@ export default function PushNotifications() {
 
   const fetchRestaurants = async () => {
     try {
-      const res = await api.get('/api/super-admin/restaurants');
+      const res = await api.get('/super/restaurants');
       if (res.data && res.data.restaurants) {
         setRestaurants(res.data.restaurants);
       }
@@ -81,7 +81,7 @@ export default function PushNotifications() {
         clickAction,
       };
 
-      const res = await api.post('/api/notifications/broadcast', payload);
+      const res = await api.post('/notifications/broadcast', payload);
       setResult(res.data);
       if (res.data.success) {
         setTitle('');
