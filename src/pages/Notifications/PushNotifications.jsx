@@ -19,6 +19,7 @@ import {
   Chip,
   Divider,
   Paper,
+  IconButton,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -27,6 +28,11 @@ import {
   Store as StoreIcon,
   People as RoleIcon,
   Public as PublicIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Image as ImageIcon,
+  TouchApp as ActionIcon,
+  AltRoute as RouteIcon,
 } from '@mui/icons-material';
 import api from '../../services/api';
 
@@ -39,6 +45,12 @@ export default function PushNotifications() {
   const [body, setBody] = useState('');
   const [sound, setSound] = useState('order_chime');
   const [clickAction, setClickAction] = useState('/');
+  const [screen, setScreen] = useState('/orders');
+  const [imageUrl, setImageUrl] = useState('');
+  const [actions, setActions] = useState([
+    { id: 'view_order', title: '👁️ View Order' },
+    { id: 'accept_order', title: '✅ Accept' },
+  ]);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -57,6 +69,21 @@ export default function PushNotifications() {
     } catch (err) {
       console.error('Error fetching restaurants:', err);
     }
+  };
+
+  const handleAddAction = () => {
+    if (actions.length >= 3) return;
+    setActions([...actions, { id: `action_${actions.length + 1}`, title: 'New Action' }]);
+  };
+
+  const handleRemoveAction = (index) => {
+    setActions(actions.filter((_, i) => i !== index));
+  };
+
+  const handleActionChange = (index, field, value) => {
+    const updated = [...actions];
+    updated[index][field] = value;
+    setActions(updated);
   };
 
   const handleSend = async (e) => {
@@ -79,6 +106,9 @@ export default function PushNotifications() {
         body,
         sound,
         clickAction,
+        screen,
+        imageUrl: imageUrl.trim() || undefined,
+        actions: actions.length > 0 ? actions : undefined,
       };
 
       const res = await api.post('/notifications/broadcast', payload);
@@ -86,6 +116,7 @@ export default function PushNotifications() {
       if (res.data.success) {
         setTitle('');
         setBody('');
+        setImageUrl('');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to dispatch push notification.');
@@ -95,13 +126,13 @@ export default function PushNotifications() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: 'auto', p: { xs: 1, sm: 2 } }}>
+    <Box sx={{ maxWidth: 1100, mx: 'auto', p: { xs: 1, sm: 2 } }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <NotificationsIcon color="primary" /> Push Notification Dispatch Center
+          <NotificationsIcon color="primary" /> Futuristic Push Notification Dispatch Center
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Broadcast targeted push notifications to mobile staff apps, admin web dashboards, or diner devices with custom sound.
+          Broadcast rich push notifications with dynamic images, custom sound chimes, deep-link screen routing, and interactive action buttons — zero app updates required!
         </Typography>
       </Box>
 
@@ -130,11 +161,11 @@ export default function PushNotifications() {
           <Card variant="outlined" sx={{ borderRadius: 3 }}>
             <CardContent sx={{ p: 3 }}>
               <form onSubmit={handleSend}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
                   1. Target Audience
                 </Typography>
 
-                <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+                <FormControl component="fieldset" sx={{ mb: 2.5, width: '100%' }}>
                   <RadioGroup row value={target} onChange={(e) => setTarget(e.target.value)}>
                     <FormControlLabel
                       value="all"
@@ -167,7 +198,7 @@ export default function PushNotifications() {
                 </FormControl>
 
                 {target === 'role' && (
-                  <FormControl fullWidth size="small" sx={{ mb: 3 }}>
+                  <FormControl fullWidth size="small" sx={{ mb: 2.5 }}>
                     <InputLabel>Select Target Role</InputLabel>
                     <Select value={role} label="Select Target Role" onChange={(e) => setRole(e.target.value)}>
                       <MenuItem value="waiter">👨‍🍳 Waiters & Staff</MenuItem>
@@ -179,7 +210,7 @@ export default function PushNotifications() {
                 )}
 
                 {target === 'restaurant' && (
-                  <FormControl fullWidth size="small" sx={{ mb: 3 }}>
+                  <FormControl fullWidth size="small" sx={{ mb: 2.5 }}>
                     <InputLabel>Select Restaurant</InputLabel>
                     <Select
                       value={restaurantId}
@@ -195,16 +226,16 @@ export default function PushNotifications() {
                   </FormControl>
                 )}
 
-                <Divider sx={{ my: 2.5 }} />
+                <Divider sx={{ my: 2 }} />
 
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                  2. Notification Content
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
+                  2. Notification Content & Rich Media
                 </Typography>
 
                 <TextField
                   fullWidth
                   label="Notification Title"
-                  placeholder="e.g. 🔔 New Order Alert or System Update"
+                  placeholder="e.g. 🔔 New Order Alert or 🎁 Special Offer"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   size="small"
@@ -215,17 +246,30 @@ export default function PushNotifications() {
                 <TextField
                   fullWidth
                   multiline
-                  rows={3}
+                  rows={2}
                   label="Message Body"
-                  placeholder="Write message body here..."
+                  placeholder="Write full notification message body..."
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   size="small"
                   required
-                  sx={{ mb: 2.5 }}
+                  sx={{ mb: 2 }}
                 />
 
-                <Grid container spacing={2} sx={{ mb: 3 }}>
+                <TextField
+                  fullWidth
+                  label="Rich Image URL (Optional)"
+                  placeholder="https://example.com/banner.jpg"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  size="small"
+                  sx={{ mb: 2 }}
+                  InputProps={{
+                    startAdornment: <ImageIcon fontSize="small" sx={{ mr: 1, color: 'action.active' }} />,
+                  }}
+                />
+
+                <Grid container spacing={2} sx={{ mb: 2.5 }}>
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Notification Sound</InputLabel>
@@ -246,13 +290,54 @@ export default function PushNotifications() {
                     <TextField
                       fullWidth
                       size="small"
-                      label="Click Deep Link / Action"
-                      value={clickAction}
-                      onChange={(e) => setClickAction(e.target.value)}
-                      placeholder="/"
+                      label="Deep Link Target Screen"
+                      value={screen}
+                      onChange={(e) => setScreen(e.target.value)}
+                      placeholder="/orders"
+                      InputProps={{
+                        startAdornment: <RouteIcon fontSize="small" sx={{ mr: 1, color: 'action.active' }} />,
+                      }}
                     />
                   </Grid>
                 </Grid>
+
+                <Divider sx={{ my: 2 }} />
+
+                {/* Interactive Action Buttons Builder */}
+                <Box sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <ActionIcon fontSize="small" color="primary" /> Dynamic Action Buttons ({actions.length}/3)
+                    </Typography>
+                    {actions.length < 3 && (
+                      <Button size="small" startIcon={<AddIcon />} onClick={handleAddAction}>
+                        Add Button
+                      </Button>
+                    )}
+                  </Box>
+
+                  {actions.map((act, index) => (
+                    <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                      <TextField
+                        size="small"
+                        label={`ID #${index + 1}`}
+                        value={act.id}
+                        onChange={(e) => handleActionChange(index, 'id', e.target.value)}
+                        sx={{ width: 140 }}
+                      />
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label={`Button Label #${index + 1}`}
+                        value={act.title}
+                        onChange={(e) => handleActionChange(index, 'title', e.target.value)}
+                      />
+                      <IconButton size="small" color="error" onClick={() => handleRemoveAction(index)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
 
                 <Button
                   type="submit"
@@ -270,12 +355,12 @@ export default function PushNotifications() {
           </Card>
         </Grid>
 
-        {/* Live Preview Card */}
+        {/* Live Device Interactive Preview */}
         <Grid item xs={12} md={5}>
-          <Card variant="outlined" sx={{ borderRadius: 3, bgcolor: '#f9fafb' }}>
+          <Card variant="outlined" sx={{ borderRadius: 3, bgcolor: '#f9fafb', position: 'sticky', top: 20 }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800 }}>
-                Device Notification Preview
+                Live Device Interactive Preview
               </Typography>
 
               <Paper
@@ -286,7 +371,7 @@ export default function PushNotifications() {
                   borderRadius: 3,
                   bgcolor: '#ffffff',
                   border: '1px solid #e5e7eb',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -316,20 +401,55 @@ export default function PushNotifications() {
                     sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
                   />
                 </Box>
+
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#111827' }}>
                   {title || 'Sample Title'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
                   {body || 'Notification message body will appear here when typed.'}
                 </Typography>
+
+                {/* Banner Image Preview */}
+                {imageUrl && (
+                  <Box
+                    component="img"
+                    src={imageUrl}
+                    alt="Notification Banner"
+                    onError={(e) => (e.target.style.display = 'none')}
+                    sx={{
+                      mt: 1.5,
+                      width: '100%',
+                      maxHeight: 140,
+                      objectFit: 'cover',
+                      borderRadius: 2,
+                      border: '1px solid #e5e7eb',
+                    }}
+                  />
+                )}
+
+                {/* Action Buttons Preview */}
+                {actions.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1.5, pt: 1.5, borderTop: '1px border #f3f4f6' }}>
+                    {actions.map((act, idx) => (
+                      <Chip
+                        key={idx}
+                        label={act.title || `Button ${idx + 1}`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontSize: 11, fontWeight: 700, borderRadius: 1.5 }}
+                      />
+                    ))}
+                  </Box>
+                )}
               </Paper>
 
               <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: '#eef2ff', border: '1px solid #c7d2fe' }}>
                 <Typography variant="caption" color="primary.dark" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
-                  💡 Custom Sound Info:
+                  🚀 Zero App Update Architecture:
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  `order_chime` triggers native `android/res/raw/order_chime` and iOS `order_chime.wav`. Ensure audio files exist in app bundles.
+                  Rich images, dynamic action buttons, custom sounds, and target deep links (`{screen}`) are parsed natively on-device in real time.
                 </Typography>
               </Box>
             </CardContent>
