@@ -138,8 +138,8 @@ const urlToBase64 = async (url) => {
 
 
 
-// Helper to render full composite sticker card PNG (Template BG + QR Code Overlay + Token Text)
-const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct, showToken) => {
+// Helper to render full composite sticker card PNG/JPG (Template BG + QR Code Overlay + Token Text)
+const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct, showToken, outputMimeType = 'image/png') => {
   if (!bgUrl) return item.dataUrl;
   try {
     const bgBase64 = await urlToBase64(bgUrl);
@@ -159,6 +159,11 @@ const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct
     canvas.height = height;
 
     const ctx = canvas.getContext('2d');
+    if (outputMimeType === 'image/jpeg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
+
     // 1. Draw Template Background Image
     ctx.drawImage(bgImg, 0, 0, width, height);
 
@@ -185,7 +190,7 @@ const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct
       ctx.fillText(`ID: ${item.token.substring(0, 10)}`, width / 2, height - height * 0.015);
     }
 
-    return canvas.toDataURL('image/png', 0.95);
+    return canvas.toDataURL(outputMimeType, 0.95);
   } catch (err) {
     console.error('Failed to render composite sticker card:', err);
     return item.dataUrl;
@@ -714,7 +719,12 @@ export default function QRGenerator() {
         orientation = 'portrait';
         cols = 4;
         rows = 5;
-      } else if (paperFormat === '12x18-inch') {
+      } else if (paperFormat === '12x18-inch' || paperFormat === '12x18-inch-9') {
+        pdfFormat = [304.8, 457.2]; // 12" x 18" in mm
+        orientation = 'portrait';
+        cols = 3;
+        rows = 3;
+      } else if (paperFormat === '12x18-inch-12') {
         pdfFormat = [304.8, 457.2]; // 12" x 18" in mm
         orientation = 'portrait';
         cols = 3;
@@ -879,12 +889,15 @@ export default function QRGenerator() {
     }
   };
 
-  // Export ZIP Archive of PNG Images (Full Composite Standee Designs)
-  const handleExportZIP = async () => {
+  // Export ZIP Archive of PNG / JPG Images (Full Composite Standee Designs)
+  const handleExportZIP = async (format = 'png') => {
     if (qrItems.length === 0) return;
     try {
       setExporting(true);
       setExportProgress(0);
+
+      const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+      const ext = format === 'jpg' ? 'jpg' : 'png';
 
       const zip = new JSZip();
       const folder = zip.folder(`Jarro_QR_Codes_${activeEnv.toUpperCase()}`);
@@ -892,17 +905,17 @@ export default function QRGenerator() {
       for (let i = 0; i < qrItems.length; i++) {
         const item = qrItems[i];
         const compositeDataUrl = customBgDataUrl
-          ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText)
+          ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText, mimeType)
           : item.dataUrl;
 
         const base64Data = compositeDataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
-        const filename = `jarro_standee_${String(item.index).padStart(3, '0')}_${item.token.substring(0, 8)}.png`;
+        const filename = `jarro_standee_${String(item.index).padStart(3, '0')}_${item.token.substring(0, 8)}.${ext}`;
         folder.file(filename, base64Data, { base64: true });
         setExportProgress(Math.round(((i + 1) / qrItems.length) * 100));
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `Jarro_QR_Sticker_Images_${qrItems.length}_${activeEnv.toUpperCase()}.zip`);
+      saveAs(content, `Jarro_QR_Sticker_Images_${format.toUpperCase()}_${qrItems.length}_${activeEnv.toUpperCase()}.zip`);
     } catch (err) {
       console.error('ZIP Export Error:', err);
     } finally {
@@ -910,12 +923,14 @@ export default function QRGenerator() {
     }
   };
 
-  const handleDownloadSinglePNG = async (item) => {
+  const handleDownloadSinglePNG = async (item, format = 'png') => {
     if (!item) return;
+    const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    const ext = format === 'jpg' ? 'jpg' : 'png';
     const compositeDataUrl = customBgDataUrl
-      ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText)
+      ? await renderCompositeStickerCard(item, customBgDataUrl, qrSizePercent, qrXPercent, qrYPercent, showTokenText, mimeType)
       : item.dataUrl;
-    saveAs(compositeDataUrl, `jarro_standee_${item.token.substring(0, 8)}.png`);
+    saveAs(compositeDataUrl, `jarro_standee_${item.token.substring(0, 8)}.${ext}`);
   };
 
 
@@ -1214,40 +1229,82 @@ export default function QRGenerator() {
                         </Button>
                       </Box>
 
-                      <Typography variant="caption" color="text.secondary">
-                        📏 QR Size: <strong>{qrSizePercent}%</strong>
-                      </Typography>
+                      {/* QR Size Control */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary">
+                          📏 QR Code Size (% of Card):
+                        </Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={qrSizePercent}
+                          inputProps={{ min: 10, max: 95, step: 1 }}
+                          onChange={(e) => {
+                            const val = Math.max(10, Math.min(95, parseInt(e.target.value) || 10));
+                            updateCoords(val, undefined, undefined);
+                          }}
+                          sx={{ width: '80px', '& input': { py: 0.3, px: 1, fontSize: '0.8rem', textAlign: 'center' } }}
+                        />
+                      </Box>
                       <Slider
                         size="small"
                         value={qrSizePercent}
                         min={10}
-                        max={90}
+                        max={95}
                         onChange={(e, v) => updateCoords(v, undefined, undefined)}
-                        sx={{ mb: 1 }}
+                        sx={{ mb: 1.5 }}
                       />
 
-                      <Typography variant="caption" color="text.secondary">
-                        ↔️ Horizontal X Position: <strong>{qrXPercent}%</strong>
-                      </Typography>
+                      {/* Horizontal X Position Control */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary">
+                          ↔️ Horizontal X Position (%):
+                        </Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={qrXPercent}
+                          inputProps={{ min: 0, max: 100, step: 1 }}
+                          onChange={(e) => {
+                            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                            updateCoords(undefined, val, undefined);
+                          }}
+                          sx={{ width: '80px', '& input': { py: 0.3, px: 1, fontSize: '0.8rem', textAlign: 'center' } }}
+                        />
+                      </Box>
                       <Slider
                         size="small"
                         value={qrXPercent}
                         min={0}
                         max={100}
                         onChange={(e, v) => updateCoords(undefined, v, undefined)}
-                        sx={{ mb: 1 }}
+                        sx={{ mb: 1.5 }}
                       />
 
-                      <Typography variant="caption" color="text.secondary">
-                        ↕️ Vertical Y Position: <strong>{qrYPercent}%</strong>
-                      </Typography>
+                      {/* Vertical Y Position Control */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary">
+                          ↕️ Vertical Y Position (%):
+                        </Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={qrYPercent}
+                          inputProps={{ min: 0, max: 100, step: 1 }}
+                          onChange={(e) => {
+                            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                            updateCoords(undefined, undefined, val);
+                          }}
+                          sx={{ width: '80px', '& input': { py: 0.3, px: 1, fontSize: '0.8rem', textAlign: 'center' } }}
+                        />
+                      </Box>
                       <Slider
                         size="small"
                         value={qrYPercent}
                         min={0}
                         max={100}
                         onChange={(e, v) => updateCoords(undefined, undefined, v)}
-                        sx={{ mb: 1 }}
+                        sx={{ mb: 1.5 }}
                       />
 
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
@@ -1292,7 +1349,8 @@ export default function QRGenerator() {
                   label="Paper Sheet Size & Layout"
                   onChange={(e) => setPaperFormat(e.target.value)}
                 >
-                  <MenuItem value="12x18-inch">🖨️ Large Printing Sheet (12" x 18" Inches - 12 Standees / Sheet, 3x4 Grid)</MenuItem>
+                  <MenuItem value="12x18-inch">🖨️ Large Printing Sheet (12" x 18" Inches - 9 Standees / Sheet, 3x3 Grid)</MenuItem>
+                  <MenuItem value="12x18-inch-12">🖨️ Large Printing Sheet (12" x 18" Inches - 12 Standees / Sheet, 3x4 Grid)</MenuItem>
                   <MenuItem value="a4-4-medium">📱 PhonePe / GPay Style Standee (A4 - 4 Big Standees / Sheet, 2x2 Grid)</MenuItem>
                   <MenuItem value="a4-2-large">🏆 PhonePe / GPay Jumbo Standee (A4 - 2 Extra Large Standees / Sheet, 2x1 Grid)</MenuItem>
                   <MenuItem value="a4-1-full">📜 Full Page Table Standee (A4 - 1 Massive Standee / Page, 1x1 Grid)</MenuItem>
@@ -1430,26 +1488,41 @@ export default function QRGenerator() {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   color="primary"
                   startIcon={<PdfIcon />}
                   onClick={handleExportPDF}
                   disabled={exporting || qrItems.length === 0}
-                  sx={{ justifyContent: 'flex-start', py: 1.2 }}
+                  sx={{ justifyContent: 'flex-start', py: 1.2, fontWeight: 700 }}
                 >
-                  Download 100 QR Sheet (PDF)
+                  Download Printable QR Sheet (PDF)
                 </Button>
 
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<ZipIcon />}
-                  onClick={handleExportZIP}
-                  disabled={exporting || qrItems.length === 0}
-                  sx={{ justifyContent: 'flex-start', py: 1.2 }}
-                >
-                  Download Images Archive (ZIP)
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<ZipIcon />}
+                    onClick={() => handleExportZIP('jpg')}
+                    disabled={exporting || qrItems.length === 0}
+                    sx={{ py: 1.2, fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    Download JPG (ZIP)
+                  </Button>
+
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<ZipIcon />}
+                    onClick={() => handleExportZIP('png')}
+                    disabled={exporting || qrItems.length === 0}
+                    sx={{ py: 1.2, fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    Download PNG (ZIP)
+                  </Button>
+                </Box>
 
                 <Button
                   variant="outlined"
