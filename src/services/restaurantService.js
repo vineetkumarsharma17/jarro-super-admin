@@ -59,6 +59,21 @@ export const restaurantService = {
         return response.data;
     },
 
+    getRestaurantOrders: async (id, params = {}) => {
+        const response = await api.get(`/super/restaurants/${id}/orders`, { params });
+        return response.data;
+    },
+
+    deleteOrder: async (orderId) => {
+        const response = await api.delete(`/super/orders/${orderId}`);
+        return response.data;
+    },
+
+    deleteAllRestaurantOrders: async (id) => {
+        const response = await api.delete(`/super/restaurants/${id}/orders`);
+        return response.data;
+    },
+
     impersonateRestaurant: async (id) => {
         const response = await api.post(`/super/impersonate-restaurant/${id}`);
         return response.data;

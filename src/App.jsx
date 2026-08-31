@@ -13,6 +13,7 @@ import RestaurantView from './pages/Restaurants/RestaurantView';
 import RestaurantMenus from './pages/Restaurants/RestaurantMenus';
 import RestaurantCategories from './pages/Restaurants/RestaurantCategories';
 import RestaurantTables from './pages/Restaurants/RestaurantTables';
+import RestaurantOrders from './pages/Restaurants/RestaurantOrders';
 import Settings from './pages/Settings/Settings';
 import UserList from './pages/Users/UserList';
 import Analytics from './pages/Analytics/Analytics';
@@ -183,6 +184,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <DashboardLayout>
               <RestaurantTables />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/restaurants/:id/orders"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <RestaurantOrders />
             </DashboardLayout>
           </ProtectedRoute>
         }

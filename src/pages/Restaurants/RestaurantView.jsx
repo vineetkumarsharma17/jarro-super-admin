@@ -20,6 +20,7 @@ import {
   Restaurant as MenuIcon,
   Category as CategoryIcon,
   TableBar as TableIcon,
+  Receipt as OrderIcon,
   ArrowForward as ArrowForwardIcon,
   CardMembership as SubscriptionIcon,
   AccountBalanceWallet as WalletIcon,
@@ -180,6 +181,15 @@ export default function RestaurantView() {
       path: `/restaurants/${id}/tables`,
       description: 'View all tables',
     },
+    {
+      title: 'Orders',
+      count: stats?.orders ?? stats?.totalOrders ?? 0,
+      icon: <OrderIcon sx={{ fontSize: 40 }} />,
+      color: '#d32f2f',
+      bgColor: '#ffebee',
+      path: `/restaurants/${id}/orders`,
+      description: 'View & delete orders',
+    },
   ];
 
   if (loading) {
@@ -261,7 +271,7 @@ export default function RestaurantView() {
           </Typography>
           <Grid container spacing={3}>
             {navigationCards.map((card, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
+              <Grid item xs={12} sm={6} md={3} key={index}>
                 <Card 
                   sx={{ 
                     borderRadius: 2,
