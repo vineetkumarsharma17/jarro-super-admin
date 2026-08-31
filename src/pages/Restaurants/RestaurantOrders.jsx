@@ -210,7 +210,7 @@ export default function RestaurantOrders() {
       render: (row) => {
         const items = row.items || [];
         if (items.length === 0) return <Typography variant="caption" color="text.secondary">No items</Typography>;
-        const summaryStr = items.map((i) => `${i.name} (x${i.quantity || 1})`).join(', ');
+        const summaryStr = items.map((i) => `${i.name || i.menuItemId?.name || i.title || 'Item'} (x${i.quantity || 1})`).join(', ');
         return (
           <Tooltip title={summaryStr} arrow placement="top">
             <Typography

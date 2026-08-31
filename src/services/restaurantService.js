@@ -69,6 +69,11 @@ export const restaurantService = {
         return response.data;
     },
 
+    bulkDeleteOrders: async (orderIds) => {
+        const response = await api.delete('/super/orders/bulk-delete', { data: { orderIds } });
+        return response.data;
+    },
+
     deleteAllRestaurantOrders: async (id) => {
         const response = await api.delete(`/super/restaurants/${id}/orders`);
         return response.data;
