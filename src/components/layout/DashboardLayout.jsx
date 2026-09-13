@@ -19,6 +19,7 @@ import {
   FormControl,
   Select,
   MenuItem,
+  Paper,
 } from '@mui/material';
 import { usePresence } from '../../context/PresenceContext';
 import {

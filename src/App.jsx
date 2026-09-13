@@ -262,18 +262,55 @@ function AppRoutes() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Super Admin App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 32, fontFamily: 'sans-serif' }}>
+          <h2>Something went wrong in Super Admin UI.</h2>
+          <pre style={{ background: '#fee2e2', color: '#991b1b', padding: 16, borderRadius: 8, overflowX: 'auto' }}>
+            {this.state.error?.toString()}
+          </pre>
+          <button
+            onClick={() => { localStorage.clear(); window.location.href = '/'; }}
+            style={{ padding: '8px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', marginTop: 12 }}
+          >
+            Clear Local Cache & Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <HashRouter>
-          <PresenceProvider>
-            <AppRoutes />
-          </PresenceProvider>
-        </HashRouter>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <HashRouter>
+            <PresenceProvider>
+              <AppRoutes />
+            </PresenceProvider>
+          </HashRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
