@@ -1119,28 +1119,33 @@ export default function SystemMonitoring() {
                 Recent Call Logs ({routeDetailModal.data.logs.length} entries)
               </Typography>
 
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, maxHeight: 300 }}>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, maxHeight: 350 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
-                    <TableRow>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
                       <TableCell sx={{ fontWeight: 700 }}>Timestamp</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Platform / Device</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>User ID / Role</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Mobile / Username</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Error Message / Details</TableCell>
                       <TableCell sx={{ fontWeight: 700 }} align="right">Latency</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Client IP</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>User Mobile</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {routeDetailModal.data.logs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
-                          No recent logs recorded for this route.
+                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            No recent call log entries recorded for this route.
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
                       routeDetailModal.data.logs.map((log) => (
-                        <TableRow key={log._id}>
-                          <TableCell sx={{ fontSize: 12 }}>
+                        <TableRow key={log._id} hover>
+                          <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>
                             {new Date(log.timestamp).toLocaleString()}
                           </TableCell>
                           <TableCell>
@@ -1151,14 +1156,48 @@ export default function SystemMonitoring() {
                               sx={{ fontWeight: 800, height: 20, fontSize: 11 }}
                             />
                           </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12 }}>
-                            {log.responseTimeMs} ms
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                            {log.ip || '-'}
+                          <TableCell>
+                            <Chip
+                              label={log.platform || 'Unknown'}
+                              size="small"
+                              variant="outlined"
+                              color={log.platform?.includes('Flutter') || log.platform?.includes('Mobile') ? 'secondary' : log.platform?.includes('Bot') ? 'error' : 'default'}
+                              sx={{ fontWeight: 700, height: 20, fontSize: 11 }}
+                            />
                           </TableCell>
                           <TableCell sx={{ fontSize: 12 }}>
+                            {log.userId ? (
+                              <Box>
+                                <Typography variant="caption" fontWeight={700} display="block">
+                                  {log.userRole ? log.userRole.toUpperCase() : 'USER'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 10 }}>
+                                  {log.userId}
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">Guest / Unauth</Typography>
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 12, fontWeight: log.userMobile ? 700 : 400 }}>
                             {log.userMobile || '-'}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 12, color: log.errorMessage ? 'error.main' : 'text.secondary', maxWidth: 220 }}>
+                            {log.errorMessage ? (
+                              <Tooltip title={log.errorMessage}>
+                                <Typography variant="caption" color="error" fontWeight={600} noWrap display="block">
+                                  {log.errorMessage}
+                                </Typography>
+                              </Tooltip>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {log.responseTimeMs} ms
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap' }}>
+                            {log.ip || '-'}
                           </TableCell>
                         </TableRow>
                       ))
