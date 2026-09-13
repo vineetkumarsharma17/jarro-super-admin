@@ -13,7 +13,7 @@ import {
   Tooltip,
   Popover,
 } from '@mui/material';
-import { CloudUpload, Edit, Delete, DeleteSweep, DeleteForever } from '@mui/icons-material';
+import { CloudUpload, Edit, Delete, DeleteSweep } from '@mui/icons-material';
 import { useParams } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
 import DataTable from '../../components/common/DataTable';
@@ -36,8 +36,6 @@ export default function RestaurantMenus() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
-  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
-  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const [variantAnchorEl, setVariantAnchorEl] = useState(null);
   const [selectedVariants, setSelectedVariants] = useState([]);
 
@@ -155,21 +153,6 @@ export default function RestaurantMenus() {
       console.error('Failed to bulk delete:', err);
     } finally {
       setBulkDeleteLoading(false);
-    }
-  };
-
-  const handleDeleteAllMenusConfirm = async () => {
-    try {
-      setDeleteAllLoading(true);
-      await restaurantService.deleteAllRestaurantMenus(id);
-      setDeleteAllConfirmOpen(false);
-      setSelected([]);
-      fetchMenus();
-    } catch (err) {
-      console.error('Failed to delete all menu items:', err);
-      alert(err.response?.data?.message || 'Failed to delete all menu items');
-    } finally {
-      setDeleteAllLoading(false);
     }
   };
 
@@ -334,16 +317,6 @@ export default function RestaurantMenus() {
               >
                 Bulk Import
               </Button>
-              <Button
-                variant="contained"
-                color="error"
-                startIcon={<DeleteForever />}
-                onClick={() => setDeleteAllConfirmOpen(true)}
-                disabled={totalCount === 0 || loading}
-                sx={{ px: 3 }}
-              >
-                Delete All Items
-              </Button>
               <Chip
                 label={`Total: ${totalCount}`}
                 color="primary"
@@ -425,17 +398,6 @@ export default function RestaurantMenus() {
         confirmText="Delete"
         severity="error"
         loading={bulkDeleteLoading}
-      />
-
-      <ConfirmDialog
-        open={deleteAllConfirmOpen}
-        onClose={() => setDeleteAllConfirmOpen(false)}
-        onConfirm={handleDeleteAllMenusConfirm}
-        title="Delete All Menu Items"
-        message={`Are you sure you want to permanently delete ALL ${totalCount} menu items for "${restaurant?.name}"? This action cannot be undone.`}
-        confirmText="Delete All Items"
-        severity="error"
-        loading={deleteAllLoading}
       />
 
       <Popover

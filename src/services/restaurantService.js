@@ -49,18 +49,8 @@ export const restaurantService = {
         return response.data;
     },
 
-    deleteAllRestaurantMenus: async (id) => {
-        const response = await api.delete(`/super/restaurants/${id}/menus`);
-        return response.data;
-    },
-
     getRestaurantCategories: async (id, params = {}) => {
         const response = await api.get(`/super/restaurants/${id}/categories`, { params });
-        return response.data;
-    },
-
-    deleteAllRestaurantCategories: async (id) => {
-        const response = await api.delete(`/super/restaurants/${id}/categories`);
         return response.data;
     },
 
