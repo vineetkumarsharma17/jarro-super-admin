@@ -50,8 +50,11 @@ import {
   FormatListNumbered as ProcessIcon,
   DeleteForever as DeleteIcon,
   Clear as ClearIcon,
+  Visibility as VisibilityIcon,
+  BugReport as BugReportIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
-import { getSystemMonitoring, clearApiLogs } from '../../services/monitoringService';
+import { getSystemMonitoring, clearApiLogs, getRouteDetails } from '../../services/monitoringService';
 import { restaurantService } from '../../services/restaurantService';
 
 export default function SystemMonitoring() {
@@ -165,6 +168,51 @@ export default function SystemMonitoring() {
       endDate: now.toISOString(),
     };
   }, [presetRange, startDate, endDate]);
+
+  // Route Detail & Debug Modal State
+  const [routeDetailModal, setRouteDetailModal] = useState({
+    open: false,
+    route: '',
+    method: 'GET',
+    loading: false,
+    data: null,
+    error: null,
+  });
+
+  // Handle Opening Route Detail Modal & Fetching Debug Info
+  const handleOpenRouteDetail = async (route, method) => {
+    setRouteDetailModal({
+      open: true,
+      route,
+      method,
+      loading: true,
+      data: null,
+      error: null,
+    });
+
+    try {
+      const dates = getComputedDates();
+      const res = await getRouteDetails({
+        route,
+        method,
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+        restaurantId: selectedRestaurant,
+      });
+
+      setRouteDetailModal((prev) => ({
+        ...prev,
+        loading: false,
+        data: res,
+      }));
+    } catch (err) {
+      setRouteDetailModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.response?.data?.message || err.message || 'Failed to load route details',
+      }));
+    }
+  };
 
   // Fetch Monitoring Data
   const fetchData = useCallback(async (isManualRefresh = false) => {
@@ -863,18 +911,24 @@ export default function SystemMonitoring() {
                   <TableCell align="right">Error Count</TableCell>
                   <TableCell align="right">Success Rate</TableCell>
                   <TableCell align="right">Avg Latency</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {topRoutes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">No API request logs match your filter criteria.</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   topRoutes.map((row, idx) => (
-                    <TableRow key={idx} hover>
+                    <TableRow
+                      key={idx}
+                      hover
+                      onClick={() => handleOpenRouteDetail(row.route, row.method)}
+                      sx={{ cursor: 'pointer' }}
+                    >
                       <TableCell>
                         <Chip
                           label={row.method}
@@ -916,6 +970,21 @@ export default function SystemMonitoring() {
                           {row.avgLatencyMs} ms
                         </Typography>
                       </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          startIcon={<VisibilityIcon fontSize="small" />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenRouteDetail(row.route, row.method);
+                          }}
+                          sx={{ fontWeight: 700, borderRadius: 2 }}
+                        >
+                          Debug / Details
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -942,6 +1011,168 @@ export default function SystemMonitoring() {
           </Button>
           <Button onClick={handleResetLogsConfirm} color="error" variant="contained" sx={{ fontWeight: 700 }}>
             Yes, Reset API Logs
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Route Debug & Details Modal */}
+      <Dialog
+        open={routeDetailModal.open}
+        onClose={() => setRouteDetailModal((prev) => ({ ...prev, open: false }))}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <BugReportIcon color="primary" />
+            <Typography variant="h6" fontWeight={800}>
+              API Debug & Route Performance Details
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setRouteDetailModal((prev) => ({ ...prev, open: false }))}>
+            <ClearIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers>
+          {routeDetailModal.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+              <CircularProgress size={36} />
+            </Box>
+          ) : routeDetailModal.error ? (
+            <Alert severity="error">{routeDetailModal.error}</Alert>
+          ) : routeDetailModal.data ? (
+            <Box>
+              {/* Route Header Info */}
+              <Paper sx={{ p: 2, mb: 3, bgcolor: '#f9fafb', borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
+                  <Chip
+                    label={routeDetailModal.data.method}
+                    color={getMethodColor(routeDetailModal.data.method)}
+                    sx={{ fontWeight: 800 }}
+                  />
+                  <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: 'monospace' }}>
+                    {routeDetailModal.data.route}
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Total Calls</Typography>
+                    <Typography variant="h6" fontWeight={800}>{routeDetailModal.data.summary.totalCalls}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Success Rate</Typography>
+                    <Typography variant="h6" fontWeight={800} color={parseFloat(routeDetailModal.data.summary.successRate) >= 95 ? 'success.main' : 'error.main'}>
+                      {routeDetailModal.data.summary.successRate}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Avg Latency</Typography>
+                    <Typography variant="h6" fontWeight={800}>{routeDetailModal.data.summary.avgLatencyMs} ms</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Errors Count</Typography>
+                    <Typography variant="h6" fontWeight={800} color={routeDetailModal.data.summary.errorCount > 0 ? 'error.main' : 'text.secondary'}>
+                      {routeDetailModal.data.summary.errorCount}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Diagnostics & Debug Root Cause Section */}
+              {routeDetailModal.data.diagnostics && routeDetailModal.data.diagnostics.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <InfoIcon color="info" fontSize="small" />
+                    Automated Debug Diagnostics & Root Cause Analysis
+                  </Typography>
+                  <Stack spacing={1}>
+                    {routeDetailModal.data.diagnostics.map((diag, index) => (
+                      <Alert key={index} severity={diag.includes('HTTP 500') ? 'error' : diag.includes('HTTP 4') ? 'warning' : 'info'} sx={{ fontWeight: 600 }}>
+                        {diag}
+                      </Alert>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* HTTP Status Code Breakdown */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+                  HTTP Status Code Breakdown
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {routeDetailModal.data.statusDistribution.map((st) => (
+                    <Chip
+                      key={st.statusCode}
+                      label={`HTTP ${st.statusCode}: ${st.count} call(s)`}
+                      color={st.statusCode < 400 ? 'success' : st.statusCode < 500 ? 'warning' : 'error'}
+                      sx={{ fontWeight: 800 }}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+
+              {/* Recent Call Logs Table */}
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+                Recent Call Logs ({routeDetailModal.data.logs.length} entries)
+              </Typography>
+
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, maxHeight: 300 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Timestamp</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="right">Latency</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Client IP</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>User Mobile</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {routeDetailModal.data.logs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          No recent logs recorded for this route.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      routeDetailModal.data.logs.map((log) => (
+                        <TableRow key={log._id}>
+                          <TableCell sx={{ fontSize: 12 }}>
+                            {new Date(log.timestamp).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={log.statusCode}
+                              size="small"
+                              color={log.statusCode < 400 ? 'success' : log.statusCode < 500 ? 'warning' : 'error'}
+                              sx={{ fontWeight: 800, height: 20, fontSize: 11 }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12 }}>
+                            {log.responseTimeMs} ms
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                            {log.ip || '-'}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 12 }}>
+                            {log.userMobile || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          ) : null}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setRouteDetailModal((prev) => ({ ...prev, open: false }))} variant="contained">
+            Close
           </Button>
         </DialogActions>
       </Dialog>
