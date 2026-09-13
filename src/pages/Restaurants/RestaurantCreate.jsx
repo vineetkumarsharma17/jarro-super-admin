@@ -59,6 +59,10 @@ export default function RestaurantCreate() {
     
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
+      // Auto-fill password with username if password wasn't manually customized or was empty
+      if (name === 'username' && (!prev.password || prev.password === prev.username)) {
+        updated.password = value;
+      }
       // Auto-sync restaurant phone if sameAsOwnerMobile is checked and owner mobile is modified
       if (name === 'mobile' && sameAsOwnerMobile) {
         updated.phone = value;
@@ -105,10 +109,9 @@ export default function RestaurantCreate() {
     } else if (!/^[0-9]{10}$/.test(formData.mobile)) {
       errors.mobile = 'Mobile number must be 10 digits';
     }
-    if (!formData.password) {
-      errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
+    const effectivePassword = formData.password.trim() || formData.username.trim();
+    if (effectivePassword && effectivePassword.length < 3) {
+      errors.password = 'Password must be at least 3 characters';
     }
     if (!formData.role) {
       errors.role = 'Role is required';
@@ -151,9 +154,10 @@ export default function RestaurantCreate() {
     try {
       setLoading(true);
 
-      // Prepare data for API
+      // Prepare data for API (default password to username if empty)
       const submitData = {
         ...formData,
+        password: formData.password.trim() || formData.username.trim(),
         latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
         longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
       };
@@ -259,9 +263,8 @@ export default function RestaurantCreate() {
                 value={formData.password}
                 onChange={handleChange}
                 error={!!formErrors.password}
-                helperText={formErrors.password}
-                required
-                placeholder="Min. 6 characters"
+                helperText={formErrors.password || "Defaults to username if left empty"}
+                placeholder="Defaults to username"
               />
             </Grid>
             <Grid item xs={12} md={6}>
