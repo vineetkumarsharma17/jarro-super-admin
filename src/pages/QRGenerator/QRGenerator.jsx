@@ -274,6 +274,18 @@ const DEFAULT_TEMPLATE_PRESETS = {
     y: 39,
     isDeletable: true,
   },
+  'mascot-chef-4x6': {
+    id: 'mascot-chef-4x6',
+    title: 'Chef JARRo 4x6 Premium Standee',
+    subtitle: 'Ultra High-Res 4x6 Inch Navy & Gold 3D Chef Poster',
+    badge: '★ 4x6 HQ',
+    badgeColor: 'success',
+    bg: getAssetPath('jarro_mascot_chef_4x6_template.jpg'),
+    size: 47,
+    x: 41.5,
+    y: 38.5,
+    isDeletable: true,
+  },
   'mascot-fox': {
     id: 'mascot-fox',
     title: 'Red Panda Foodie',
