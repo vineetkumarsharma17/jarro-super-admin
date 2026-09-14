@@ -384,18 +384,18 @@ export default function QRGenerator() {
   const [validationResult, setValidationResult] = useState(null);
   const [validatorError, setValidatorError] = useState('');
 
-  // Paper & Sheet Layout Custom System State (Default: 12" x 18" Sheet, 3.5" x 4.66" Card)
+  // Paper & Sheet Layout Custom System State (Default: 13" x 19" Sheet, 4" x 6" Card)
   const [paperFormat, setPaperFormat] = useState('custom');
   const [dimensionUnit, setDimensionUnit] = useState('in'); // 'in' (Inches) or 'mm' (Millimeters)
-  const [customWidthVal, setCustomWidthVal] = useState(12);
-  const [customHeightVal, setCustomHeightVal] = useState(18);
+  const [customWidthVal, setCustomWidthVal] = useState(13);
+  const [customHeightVal, setCustomHeightVal] = useState(19);
   const [customCols, setCustomCols] = useState(3);
-  const [customRows, setCustomRows] = useState(4);
+  const [customRows, setCustomRows] = useState(3);
 
   // Custom Physical Card Dimensions & Aspect Ratio Lock State
   const [lockAspect, setLockAspect] = useState(true);
-  const [cardWidthVal, setCardWidthVal] = useState(3.5);
-  const [cardHeightVal, setCardHeightVal] = useState(4.66);
+  const [cardWidthVal, setCardWidthVal] = useState(4);
+  const [cardHeightVal, setCardHeightVal] = useState(6);
   const [cardGapVal, setCardGapVal] = useState(0.125); // Default 0.125 inch cutting gap
 
   const handleUnitToggle = (newUnit) => {
@@ -431,7 +431,7 @@ export default function QRGenerator() {
     setCardWidthVal(val);
     const w = parseFloat(val);
     if (lockAspect && !isNaN(w) && w > 0) {
-      setCardHeightVal((w * (4 / 3)).toFixed(2));
+      setCardHeightVal((w * (6 / 4)).toFixed(2));
     }
   };
 
@@ -439,7 +439,7 @@ export default function QRGenerator() {
     setCardHeightVal(val);
     const h = parseFloat(val);
     if (lockAspect && !isNaN(h) && h > 0) {
-      setCardWidthVal((h * (3 / 4)).toFixed(2));
+      setCardWidthVal((h * (4 / 6)).toFixed(2));
     }
   };
 
@@ -879,8 +879,8 @@ export default function QRGenerator() {
       setExportProgress(0);
 
       const unitMultiplier = dimensionUnit === 'in' ? 25.4 : 1;
-      const rawW = parseFloat(customWidthVal) || (dimensionUnit === 'in' ? 12 : 304.8);
-      const rawH = parseFloat(customHeightVal) || (dimensionUnit === 'in' ? 18 : 457.2);
+      const rawW = parseFloat(customWidthVal) || (dimensionUnit === 'in' ? 13 : 330.2);
+      const rawH = parseFloat(customHeightVal) || (dimensionUnit === 'in' ? 19 : 482.6);
       const pageW = rawW * unitMultiplier; // mm
       const pageH = rawH * unitMultiplier; // mm
 
@@ -1220,8 +1220,8 @@ export default function QRGenerator() {
                       fullWidth
                       size="small"
                       onClick={() => {
-                        const fitCols = Math.max(1, Math.floor(((parseFloat(customWidthVal) || 12) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardWidthVal) || 3.5) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
-                        const fitRows = Math.max(1, Math.floor(((parseFloat(customHeightVal) || 18) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardHeightVal) || 4.66) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
+                        const fitCols = Math.max(1, Math.floor(((parseFloat(customWidthVal) || 13) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardWidthVal) || 4) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
+                        const fitRows = Math.max(1, Math.floor(((parseFloat(customHeightVal) || 19) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardHeightVal) || 6) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
                         const gridFit = Math.min(parseInt(customCols) || fitCols, fitCols) * Math.min(parseInt(customRows) || fitRows, fitRows);
                         setCount(gridFit);
                         handleGenerateBatch(gridFit);
@@ -1652,10 +1652,10 @@ export default function QRGenerator() {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {(() => {
-                  const sW = parseFloat(customWidthVal) || 12;
-                  const sH = parseFloat(customHeightVal) || 18;
-                  const cW = parseFloat(cardWidthVal) || 3.5;
-                  const cH = parseFloat(cardHeightVal) || 4.66;
+                  const sW = parseFloat(customWidthVal) || 13;
+                  const sH = parseFloat(customHeightVal) || 19;
+                  const cW = parseFloat(cardWidthVal) || 4;
+                  const cH = parseFloat(cardHeightVal) || 6;
                   const gap = parseFloat(cardGapVal) || 0.125;
 
                   const maxColsThatFit = Math.max(1, Math.floor((sW + gap) / (cW + gap)));
@@ -1795,9 +1795,9 @@ export default function QRGenerator() {
                         }}
                       >
                         {(() => {
-                          const cW = parseFloat(cardWidthVal) || 3.5;
-                          const cH = parseFloat(cardHeightVal) || 4.66;
-                          const cardAspectPct = (cW > 0 && cH > 0) ? (cH / cW) * 100 : 133.33;
+                          const cW = parseFloat(cardWidthVal) || 4;
+                          const cH = parseFloat(cardHeightVal) || 6;
+                          const cardAspectPct = (cW > 0 && cH > 0) ? (cH / cW) * 100 : 150;
 
                           return (
                             <Box sx={{ position: 'relative', width: '100%', pt: `${cardAspectPct}%` }}>
@@ -1918,10 +1918,10 @@ export default function QRGenerator() {
 
                       {/* Sheet Canvas Container */}
                       {(() => {
-                        const sW = parseFloat(customWidthVal) || 12;
-                        const sH = parseFloat(customHeightVal) || 18;
-                        const cW = parseFloat(cardWidthVal) || 3.5;
-                        const cH = parseFloat(cardHeightVal) || 4.66;
+                        const sW = parseFloat(customWidthVal) || 13;
+                        const sH = parseFloat(customHeightVal) || 19;
+                        const cW = parseFloat(cardWidthVal) || 4;
+                        const cH = parseFloat(cardHeightVal) || 6;
                         const gap = parseFloat(cardGapVal) || 0.125;
 
                         const maxColsThatFit = Math.max(1, Math.floor((sW + gap) / (cW + gap)));
