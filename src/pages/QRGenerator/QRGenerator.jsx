@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -36,6 +36,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   QrCode2 as QrCodeIcon,
@@ -52,6 +54,9 @@ import {
   Delete as DeleteIcon,
   Restore as RestoreIcon,
   AddPhotoAlternate as AddPhotoIcon,
+  Close as CloseIcon,
+  Check as CheckIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 
 import QRCode from 'qrcode';
@@ -200,16 +205,36 @@ const renderCompositeStickerCard = async (item, bgUrl, qrSizePct, qrXPct, qrYPct
 
 
 
+const PRESET_TEMPLATE_FILES = [
+  'jarro_official_whatsapp_qr_template.jpg',
+  'jaaro_digital_menu_qr_template.jpg',
+  'jaaro_slogan_bilingual_qr_template.jpg',
+  'jarro_mascot_chef_qr_template.jpg',
+  'jarro_mascot_fox_qr_template.jpg',
+  'jarro_mascot_rocket_qr_template.jpg',
+  'jarro_mascot_food_buddy_qr_template.jpg',
+  'jarro_vsafe_qr_sticker_template.jpg',
+];
+
 const getAssetPath = (filename) => {
   if (!filename) return null;
+
+  for (const presetFile of PRESET_TEMPLATE_FILES) {
+    if (filename.includes(presetFile)) {
+      const base = import.meta.env.BASE_URL || '/';
+      const cleanBase = base.endsWith('/') ? base : base + '/';
+      return `${cleanBase}assets/${presetFile}`;
+    }
+  }
+
   if (filename.startsWith('data:') || filename.startsWith('http://') || filename.startsWith('https://')) {
     return filename;
   }
   const base = import.meta.env.BASE_URL || '/';
   const cleanBase = base.endsWith('/') ? base : base + '/';
   const cleanFilename = filename.startsWith('./') ? filename.substring(2) : filename;
-  const pathWithoutAssets = cleanFilename.startsWith('assets/') ? cleanFilename : `assets/${cleanFilename}`;
-  return `${cleanBase}${pathWithoutAssets}`;
+  const pathWithoutAssets = cleanFilename.startsWith('assets/') ? cleanFilename.substring(7) : cleanFilename;
+  return `${cleanBase}assets/${pathWithoutAssets}`;
 };
 
 const DEFAULT_TEMPLATE_PRESETS = {
@@ -347,9 +372,8 @@ export default function QRGenerator() {
   const [validationResult, setValidationResult] = useState(null);
   const [validatorError, setValidatorError] = useState('');
 
-  // Paper & Sheet Layout State (Default: PhonePe/GPay Style 4 Standees per sheet)
-  const [paperFormat, setPaperFormat] = useState('a4-4-medium');
-  const [pdfPageOrientation, setPdfPageOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
+  // Paper & Sheet Layout Custom System State (Default: 12" x 18" Sheet, 3.5" x 4.66" Card)
+  const [paperFormat, setPaperFormat] = useState('custom');
   const [dimensionUnit, setDimensionUnit] = useState('in'); // 'in' (Inches) or 'mm' (Millimeters)
   const [customWidthVal, setCustomWidthVal] = useState(12);
   const [customHeightVal, setCustomHeightVal] = useState(18);
@@ -360,6 +384,36 @@ export default function QRGenerator() {
   const [lockAspect, setLockAspect] = useState(true);
   const [cardWidthVal, setCardWidthVal] = useState(3.5);
   const [cardHeightVal, setCardHeightVal] = useState(4.66);
+  const [cardGapVal, setCardGapVal] = useState(0.125); // Default 0.125 inch cutting gap
+
+  const handleUnitToggle = (newUnit) => {
+    if (!newUnit || newUnit === dimensionUnit) return;
+    const isToMm = newUnit === 'mm';
+    const mult = isToMm ? 25.4 : 1 / 25.4;
+
+    setCustomWidthVal((prev) => {
+      const v = parseFloat(prev);
+      return !isNaN(v) ? (isToMm ? (v * mult).toFixed(1) : (v * mult).toFixed(2)) : prev;
+    });
+    setCustomHeightVal((prev) => {
+      const v = parseFloat(prev);
+      return !isNaN(v) ? (isToMm ? (v * mult).toFixed(1) : (v * mult).toFixed(2)) : prev;
+    });
+    setCardWidthVal((prev) => {
+      const v = parseFloat(prev);
+      return !isNaN(v) ? (isToMm ? (v * mult).toFixed(1) : (v * mult).toFixed(2)) : prev;
+    });
+    setCardHeightVal((prev) => {
+      const v = parseFloat(prev);
+      return !isNaN(v) ? (isToMm ? (v * mult).toFixed(1) : (v * mult).toFixed(2)) : prev;
+    });
+    setCardGapVal((prev) => {
+      const v = parseFloat(prev);
+      return !isNaN(v) ? (isToMm ? (v * mult).toFixed(1) : (v * mult).toFixed(3)) : prev;
+    });
+
+    setDimensionUnit(newUnit);
+  };
 
   const handleCardWidthChange = (val) => {
     setCardWidthVal(val);
@@ -377,11 +431,50 @@ export default function QRGenerator() {
     }
   };
 
+  // Auto-calculate Grid Cols & Rows whenever sheet, card dimensions or cutting gap change
+  useEffect(() => {
+    const unitMult = dimensionUnit === 'in' ? 25.4 : 1;
+    const sW = (parseFloat(customWidthVal) || 0) * unitMult;
+    const sH = (parseFloat(customHeightVal) || 0) * unitMult;
+    const cW = (parseFloat(cardWidthVal) || 0) * unitMult;
+    const cH = (parseFloat(cardHeightVal) || 0) * unitMult;
+    const gap = (parseFloat(cardGapVal) || 0) * unitMult;
+
+    if (sW > 0 && sH > 0 && cW > 0 && cH > 0) {
+      const autoCols = Math.max(1, Math.floor((sW + gap) / (cW + gap)));
+      const autoRows = Math.max(1, Math.floor((sH + gap) / (cH + gap)));
+      setCustomCols(autoCols);
+      setCustomRows(autoRows);
+    }
+  }, [customWidthVal, customHeightVal, cardWidthVal, cardHeightVal, cardGapVal, dimensionUnit]);
+
 
   // Custom Sticker Design Template State & Saved Coords
   const [templateCoords, setTemplateCoords] = useState(loadSavedCoords);
   const [templateMode, setTemplateMode] = useState('jarro-official-whatsapp');
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [newTemplateTitle, setNewTemplateTitle] = useState('');
+  const [newTemplateImage, setNewTemplateImage] = useState(null);
+  const [previewPage, setPreviewPage] = useState(1);
+
+  const [customTemplates, setCustomTemplates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('jarro_custom_templates');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const allTemplates = useMemo(() => {
+    const combined = { ...DEFAULT_TEMPLATE_PRESETS };
+    customTemplates.forEach((ct) => {
+      combined[ct.id] = ct;
+    });
+    return combined;
+  }, [customTemplates]);
+
   const [deletedTemplateIds, setDeletedTemplateIds] = useState(() => {
     try {
       const saved = localStorage.getItem('jarro_deleted_templates');
@@ -409,17 +502,105 @@ export default function QRGenerator() {
     return saved['jarro-official-whatsapp']?.y ?? 39;
   });
 
+  const handleSaveNewCustomTemplate = () => {
+    if (!newTemplateImage) return;
+    const id = `custom-${Date.now()}`;
+    const newPreset = {
+      id,
+      title: newTemplateTitle.trim() || 'Custom Uploaded Standee',
+      subtitle: 'User Custom Template Design',
+      badge: 'CUSTOM',
+      badgeColor: 'primary',
+      bg: newTemplateImage,
+      size: 47,
+      x: 41,
+      y: 39,
+      isDeletable: true,
+    };
+
+    const updated = [...customTemplates, newPreset];
+    setCustomTemplates(updated);
+    try {
+      localStorage.setItem('jarro_custom_templates', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to save custom template to localStorage:', err);
+    }
+
+    setTemplateCoords((prev) => {
+      const up = { ...prev, [id]: newPreset };
+      try {
+        localStorage.setItem('jarro_qr_template_coords', JSON.stringify(up));
+      } catch (_) {}
+      return up;
+    });
+
+    setTemplateMode(id);
+    setCustomBgDataUrl(newTemplateImage);
+    setQrSizePercent(47);
+    setQrXPercent(41);
+    setQrYPercent(39);
+
+    setUploadDialogOpen(false);
+    setNewTemplateTitle('');
+    setNewTemplateImage(null);
+  };
+
   const handleDeleteTemplate = (templateId, e) => {
     if (e) e.stopPropagation();
-    const updatedDeleted = [...deletedTemplateIds, templateId];
-    setDeletedTemplateIds(updatedDeleted);
-    try {
-      localStorage.setItem('jarro_deleted_templates', JSON.stringify(updatedDeleted));
-    } catch (err) {
-      console.error('Failed to save deleted templates:', err);
+
+    const isCustom = templateId.startsWith('custom-') && templateId !== 'custom-bg';
+
+    let updatedDeleted = deletedTemplateIds;
+
+    if (isCustom) {
+      // Completely remove custom template from customTemplates state & localStorage
+      const updatedCustom = customTemplates.filter((ct) => ct.id !== templateId);
+      setCustomTemplates(updatedCustom);
+      try {
+        localStorage.setItem('jarro_custom_templates', JSON.stringify(updatedCustom));
+      } catch (err) {
+        console.error('Failed to update custom templates in localStorage:', err);
+      }
+
+      // Ensure custom template ID is removed from deletedTemplateIds if present
+      updatedDeleted = deletedTemplateIds.filter((id) => id !== templateId);
+      setDeletedTemplateIds(updatedDeleted);
+      try {
+        localStorage.setItem('jarro_deleted_templates', JSON.stringify(updatedDeleted));
+      } catch (_) {}
+    } else {
+      // For built-in preset templates, add to deletedTemplateIds to hide from gallery
+      updatedDeleted = Array.from(new Set([...deletedTemplateIds, templateId]));
+      setDeletedTemplateIds(updatedDeleted);
+      try {
+        localStorage.setItem('jarro_deleted_templates', JSON.stringify(updatedDeleted));
+      } catch (err) {
+        console.error('Failed to save deleted templates:', err);
+      }
     }
+
+    // Completely remove saved coordinates for this template
+    try {
+      const savedCoords = loadSavedCoords();
+      if (savedCoords[templateId]) {
+        delete savedCoords[templateId];
+        localStorage.setItem('jarro_qr_template_coords', JSON.stringify(savedCoords));
+      }
+    } catch (_) {}
+
+    // Fallback if currently selected template was deleted
     if (templateMode === templateId) {
-      handleSelectTemplate('jarro-official-whatsapp');
+      const remainingCustom = customTemplates.filter((ct) => ct.id !== templateId);
+      const combined = { ...DEFAULT_TEMPLATE_PRESETS };
+      remainingCustom.forEach((ct) => {
+        combined[ct.id] = ct;
+      });
+
+      const availableKeys = Object.keys(combined).filter(
+        (k) => k !== templateId && !updatedDeleted.includes(k)
+      );
+      const fallbackMode = availableKeys[0] || 'jarro-official-whatsapp';
+      handleSelectTemplate(fallbackMode);
     }
   };
 
@@ -473,8 +654,8 @@ export default function QRGenerator() {
 
   const handleSelectTemplate = (mode) => {
     setTemplateMode(mode);
-    const coords = templateCoords[mode] || DEFAULT_TEMPLATE_PRESETS[mode] || DEFAULT_TEMPLATE_PRESETS['custom-bg'];
-    if (coords.bg) setCustomBgDataUrl(coords.bg);
+    const coords = templateCoords[mode] || allTemplates[mode] || DEFAULT_TEMPLATE_PRESETS['custom-bg'];
+    if (coords.bg) setCustomBgDataUrl(getAssetPath(coords.bg));
     setQrSizePercent(coords.size);
     setQrXPercent(coords.x);
     setQrYPercent(coords.y);
@@ -579,12 +760,13 @@ export default function QRGenerator() {
   };
 
   // Generate & Server-Validate Batch QR Codes (Guarantees 100% Uniqueness against Database)
-  const handleGenerateBatch = async () => {
+  const handleGenerateBatch = async (overrideCount) => {
     try {
       setGenerating(true);
       setIsVerifiedUnique(false);
       setGeneratingStatus('Generating unique candidate tokens...');
-      const qty = Math.min(Math.max(parseInt(count) || 1, 1), 500);
+      const targetQty = overrideCount !== undefined ? overrideCount : count;
+      const qty = Math.min(Math.max(parseInt(targetQty) || 1, 1), 500);
       const baseUrl = getBaseScanUrl();
 
       // Step 1: Generate unique tokens locally
@@ -677,106 +859,21 @@ export default function QRGenerator() {
     handleGenerateBatch();
   }, [activeEnv, transparentBg]);
 
-  // Export PDF Sheet (Multi-layout QR stickers grid)
+  // Export PDF Sheet (Multi-layout QR stickers grid using exact Custom Dimensions)
   const handleExportPDF = async () => {
     if (qrItems.length === 0) return;
     try {
       setExporting(true);
       setExportProgress(0);
 
-      let pdfFormat = 'a4';
-      let orientation = 'portrait';
-      let cols = 3;
-      let rows = 4;
+      const unitMultiplier = dimensionUnit === 'in' ? 25.4 : 1;
+      const rawW = parseFloat(customWidthVal) || (dimensionUnit === 'in' ? 12 : 304.8);
+      const rawH = parseFloat(customHeightVal) || (dimensionUnit === 'in' ? 18 : 457.2);
+      const pageW = rawW * unitMultiplier; // mm
+      const pageH = rawH * unitMultiplier; // mm
 
-      if (paperFormat === 'a4-4-medium') {
-        pdfFormat = 'a4';
-        orientation = 'portrait';
-        cols = 2;
-        rows = 2;
-      } else if (paperFormat === 'a4-2-large') {
-        pdfFormat = 'a4';
-        orientation = 'landscape';
-        cols = 2;
-        rows = 1;
-      } else if (paperFormat === 'a4-1-full') {
-        pdfFormat = 'a4';
-        orientation = 'portrait';
-        cols = 1;
-        rows = 1;
-      } else if (paperFormat === 'a4-6') {
-        pdfFormat = 'a4';
-        orientation = 'portrait';
-        cols = 2;
-        rows = 3;
-      } else if (paperFormat === 'a4-12') {
-        pdfFormat = 'a4';
-        orientation = 'portrait';
-        cols = 3;
-        rows = 4;
-      } else if (paperFormat === 'a4-20') {
-        pdfFormat = 'a4';
-        orientation = 'portrait';
-        cols = 4;
-        rows = 5;
-      } else if (paperFormat === '12x18-inch' || paperFormat === '12x18-inch-9') {
-        pdfFormat = [304.8, 457.2]; // 12" x 18" in mm
-        orientation = 'portrait';
-        cols = 3;
-        rows = 3;
-      } else if (paperFormat === '12x18-inch-12') {
-        pdfFormat = [304.8, 457.2]; // 12" x 18" in mm
-        orientation = 'portrait';
-        cols = 3;
-        rows = 4;
-      } else if (paperFormat === '20x12-inch') {
-        pdfFormat = [508, 304.8]; // 20" x 12" in mm
-        orientation = 'landscape';
-        cols = 8;
-        rows = 4;
-      } else if (paperFormat === 'a3-24') {
-        pdfFormat = 'a3';
-        orientation = 'portrait';
-        cols = 4;
-        rows = 6;
-      } else if (paperFormat === 'custom') {
-        const unitMultiplier = dimensionUnit === 'in' ? 25.4 : 1;
-        const rawW = parseFloat(customWidthVal);
-        const rawH = parseFloat(customHeightVal);
-        const pageW = (!isNaN(rawW) && rawW > 0 ? rawW : (dimensionUnit === 'in' ? 12 : 304.8)) * unitMultiplier;
-        const pageH = (!isNaN(rawH) && rawH > 0 ? rawH : (dimensionUnit === 'in' ? 18 : 457.2)) * unitMultiplier;
-
-        pdfFormat = [pageW, pageH];
-        orientation = pageW >= pageH ? 'landscape' : 'portrait';
-
-        const rawCardW = parseFloat(cardWidthVal);
-        const rawCardH = parseFloat(cardHeightVal);
-
-        if (!isNaN(rawCardW) && rawCardW > 0 && !isNaN(rawCardH) && rawCardH > 0) {
-          const reqCardW = rawCardW * unitMultiplier;
-          const reqCardH = rawCardH * unitMultiplier;
-          cols = Math.max(1, Math.floor((pageW - 10) / reqCardW));
-          rows = Math.max(1, Math.floor((pageH - 10) / reqCardH));
-        } else {
-          cols = Math.max(parseInt(customCols) || 1, 1);
-          rows = Math.max(parseInt(customRows) || 1, 1);
-        }
-      }
-
-      // Explicit User Page Orientation Override (Portrait vs Landscape)
-      if (pdfPageOrientation === 'portrait' || pdfPageOrientation === 'landscape') {
-        orientation = pdfPageOrientation;
-        // Swap cols/rows if orientation was flipped so grid auto-adapts
-        if (pdfPageOrientation === 'landscape' && cols < rows) {
-          const temp = cols;
-          cols = rows;
-          rows = temp;
-        } else if (pdfPageOrientation === 'portrait' && cols > rows) {
-          const temp = cols;
-          cols = rows;
-          rows = temp;
-        }
-      }
+      const pdfFormat = [pageW, pageH];
+      const orientation = pageW >= pageH ? 'landscape' : 'portrait';
 
       const doc = new jsPDF({
         orientation,
@@ -786,21 +883,24 @@ export default function QRGenerator() {
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 5;
-      const cellWidth = (pageWidth - margin * 2) / cols;
-      const cellHeight = (pageHeight - margin * 2) / rows;
+
+      const rawCardW = (parseFloat(cardWidthVal) || 0) * unitMultiplier;
+      const rawCardH = (parseFloat(cardHeightVal) || 0) * unitMultiplier;
+      const cardGap = (parseFloat(cardGapVal) || 0) * unitMultiplier;
+
+      // Determine max columns and rows that fit without scaling down cards
+      const maxColsThatFit = Math.max(1, Math.floor((pageWidth + cardGap) / (rawCardW + cardGap)));
+      const maxRowsThatFit = Math.max(1, Math.floor((pageHeight + cardGap) / (rawCardH + cardGap)));
+
+      const cols = Math.min(Math.max(parseInt(customCols) || 1, 1), maxColsThatFit);
+      const rows = Math.min(Math.max(parseInt(customRows) || 1, 1), maxRowsThatFit);
+
+      // Outer margin is 0 (flush to sheet top-left corner so outer sides require no cutting)
+      const marginX = 0;
+      const marginY = 0;
 
       // Convert custom background image URL to Base64 Data URL for jsPDF
       const bgBase64 = customBgDataUrl ? await urlToBase64(customBgDataUrl) : null;
-
-      // Measure true native aspect ratio of template image
-      let nativeAspect = 3 / 4;
-      if (customBgDataUrl) {
-        const { width: w, height: h } = await getImageDimensions(customBgDataUrl);
-        if (w > 0 && h > 0) {
-          nativeAspect = w / h;
-        }
-      }
 
       for (let i = 0; i < qrItems.length; i++) {
         const item = qrItems[i];
@@ -813,29 +913,23 @@ export default function QRGenerator() {
         const col = itemIndexOnPage % cols;
         const row = Math.floor(itemIndexOnPage / cols);
 
-        const x = margin + col * cellWidth;
-        const y = margin + row * cellHeight;
+        const x = marginX + col * (rawCardW + cardGap);
+        const y = marginY + row * (rawCardH + cardGap);
 
         if (bgBase64) {
-          // Maintain 100% native aspect ratio of the sticker card template with ZERO stretching
-          let drawWidth = cellWidth - 2;
-          let drawHeight = drawWidth / nativeAspect;
+          // Fill exact requested Card Width & Card Height specified by user
+          const drawWidth = rawCardW;
+          const drawHeight = rawCardH;
 
-          if (drawHeight > cellHeight - 2) {
-            drawHeight = cellHeight - 2;
-            drawWidth = drawHeight * nativeAspect;
-          }
+          const drawX = x;
+          const drawY = y;
 
-          // Center the sticker card in the grid cell
-          const drawX = x + (cellWidth - drawWidth) / 2;
-          const drawY = y + (cellHeight - drawHeight) / 2;
-
-          // Draw Custom Background Image for Sticker (Zero Distortion)
+          // Draw Custom Background Image
           doc.addImage(bgBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight, undefined, 'FAST');
 
-          // Position QR Code based on custom position sliders (%) - Exact 1:1 match with Web Preview
+          // Position QR Code based on sliders (%)
           const qrWidth = drawWidth * (qrSizePercent / 100);
-          const qrHeight = qrWidth; // Square QR Code
+          const qrHeight = qrWidth;
           const qrX = drawX + drawWidth * (qrXPercent / 100);
           const qrY = drawY + drawHeight * (qrYPercent / 100);
 
@@ -849,28 +943,28 @@ export default function QRGenerator() {
           }
         } else {
           // Default Jarro Card Template
-          const cardWidth = cellWidth - 3;
-          const cardHeight = cellHeight - 3;
+          const cardWidth = rawCardW;
+          const cardHeight = rawCardH;
           doc.setDrawColor(210, 220, 235);
           doc.setLineWidth(0.3);
-          doc.roundedRect(x + 1.5, y + 1.5, cardWidth, cardHeight, 2, 2, 'S');
+          doc.roundedRect(x, y, cardWidth, cardHeight, 2, 2, 'S');
 
-          const headerFontSize = Math.min(cellHeight * 0.15, 10);
+          const headerFontSize = Math.min(cardHeight * 0.15, 10);
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(headerFontSize);
           doc.setTextColor(79, 70, 229);
-          doc.text('JARRo', x + cellWidth / 2, y + cellHeight * 0.13, { align: 'center' });
+          doc.text('JARRo', x + cardWidth / 2, y + cardHeight * 0.13, { align: 'center' });
 
-          const qrSize = Math.min(cellWidth * 0.65, cellHeight * 0.55);
-          const qrX = x + (cellWidth - qrSize) / 2;
-          const qrY = y + cellHeight * 0.18;
+          const qrSize = Math.min(cardWidth * 0.65, cardHeight * 0.55);
+          const qrX = x + (cardWidth - qrSize) / 2;
+          const qrY = y + cardHeight * 0.18;
           doc.addImage(item.dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
-          const footerFontSize = Math.min(cellHeight * 0.1, 7);
+          const footerFontSize = Math.min(cardHeight * 0.1, 7);
           doc.setFont('courier', 'bold');
           doc.setFontSize(footerFontSize);
           doc.setTextColor(30, 41, 59);
-          doc.text(`ID: ${item.token.substring(0, 10)}...`, x + cellWidth / 2, y + cellHeight - cellHeight * 0.1, { align: 'center' });
+          doc.text(`ID: ${item.token.substring(0, 10)}...`, x + cardWidth / 2, y + cardHeight - cardHeight * 0.1, { align: 'center' });
 
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(Math.max(footerFontSize - 1.5, 5));
@@ -881,7 +975,7 @@ export default function QRGenerator() {
         setExportProgress(Math.round(((i + 1) / qrItems.length) * 100));
       }
 
-      doc.save(`Jarro_QR_Sheet_${qrItems.length}_${paperFormat}_${activeEnv.toUpperCase()}.pdf`);
+      doc.save(`Jarro_QR_Sheet_${qrItems.length}_Custom_${customWidthVal}x${customHeightVal}${dimensionUnit}_${activeEnv.toUpperCase()}.pdf`);
     } catch (err) {
       console.error('PDF Export Error:', err);
     } finally {
@@ -1094,27 +1188,50 @@ export default function QRGenerator() {
                 Batch Configuration
               </Typography>
 
-              <TextField
-                fullWidth
-                label="Number of QR Codes to Generate"
-                type="number"
-                value={count}
-                onChange={(e) => setCount(e.target.value)}
-                inputProps={{ min: 1, max: 500 }}
-                helperText="Enter quantity (e.g. 10, 50, 100, 200)"
-                sx={{ mb: 3 }}
-              />
+              <Box sx={{ mb: 2.5 }}>
+                <Grid container spacing={1} alignItems="center">
+                  <Grid item xs={8}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="QR Batch Quantity"
+                      type="number"
+                      value={count}
+                      onChange={(e) => setCount(e.target.value)}
+                      inputProps={{ min: 1, max: 500 }}
+                      helperText={`Active batch: ${qrItems.length} QRs generated`}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      size="small"
+                      onClick={() => {
+                        const fitCols = Math.max(1, Math.floor(((parseFloat(customWidthVal) || 12) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardWidthVal) || 3.5) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
+                        const fitRows = Math.max(1, Math.floor(((parseFloat(customHeightVal) || 18) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1)) / ((parseFloat(cardHeightVal) || 4.66) * (dimensionUnit === 'in' ? 25.4 : 1) + (parseFloat(cardGapVal) || 0.125) * (dimensionUnit === 'in' ? 25.4 : 1))));
+                        const gridFit = Math.min(parseInt(customCols) || fitCols, fitCols) * Math.min(parseInt(customRows) || fitRows, fitRows);
+                        setCount(gridFit);
+                        handleGenerateBatch(gridFit);
+                      }}
+                      sx={{ py: 1, whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.72rem', borderColor: '#2563eb' }}
+                    >
+                      ⚡ Fill Sheet
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Box>
 
               <Button
                 fullWidth
                 variant="contained"
                 size="large"
                 startIcon={generating ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-                onClick={handleGenerateBatch}
+                onClick={() => handleGenerateBatch()}
                 disabled={generating}
-                sx={{ mb: 3, py: 1.5 }}
+                sx={{ mb: 3, py: 1.5, fontWeight: 700 }}
               >
-                {generating ? 'Generating QR Batch...' : `Generate ${count} Fresh QR Codes`}
+                {generating ? 'Generating QR Batch...' : `⚡ Generate ${count} Fresh QR Codes`}
               </Button>
 
               <Divider sx={{ my: 2 }} />
@@ -1162,44 +1279,71 @@ export default function QRGenerator() {
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
                       <Typography variant="subtitle2" fontWeight={700} noWrap>
-                        {DEFAULT_TEMPLATE_PRESETS[templateMode]?.title || 'Selected Design'}
+                        {allTemplates[templateMode]?.title || 'Selected Design'}
                       </Typography>
-                      {DEFAULT_TEMPLATE_PRESETS[templateMode]?.badge && (
+                      {allTemplates[templateMode]?.badge && (
                         <Chip
-                          label={DEFAULT_TEMPLATE_PRESETS[templateMode].badge}
-                          color={DEFAULT_TEMPLATE_PRESETS[templateMode].badgeColor || 'default'}
+                          label={allTemplates[templateMode].badge}
+                          color={allTemplates[templateMode].badgeColor || 'default'}
                           size="small"
                           sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
                         />
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                      {DEFAULT_TEMPLATE_PRESETS[templateMode]?.subtitle || 'Custom card template design'}
+                      {allTemplates[templateMode]?.subtitle || 'Custom card template design'}
                     </Typography>
                   </Box>
                 </Box>
 
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<GalleryIcon />}
-                  onClick={() => setGalleryOpen(true)}
-                  sx={{
-                    py: 1,
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
-                    },
-                  }}
-                >
-                  🖼️ Browse Template Gallery
-                </Button>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      startIcon={<GalleryIcon />}
+                      onClick={() => setGalleryOpen(true)}
+                      sx={{
+                        py: 1,
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        borderRadius: 2,
+                        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
+                        },
+                      }}
+                    >
+                      Browse Gallery
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<UploadIcon />}
+                      onClick={() => setUploadDialogOpen(true)}
+                      sx={{
+                        py: 1,
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        borderRadius: 2,
+                        borderColor: '#2563eb',
+                        color: '#2563eb',
+                        '&:hover': {
+                          borderColor: '#1d4ed8',
+                          bgcolor: '#eff6ff',
+                        },
+                      }}
+                    >
+                      Upload New
+                    </Button>
+                  </Grid>
+                </Grid>
               </Paper>
 
-              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-') || templateMode.startsWith('jaaro-') || templateMode.startsWith('jarro-')) && (
+              {(templateMode === 'custom-bg' || templateMode === 'vsafe-template' || templateMode.startsWith('mascot-') || templateMode.startsWith('jaaro-') || templateMode.startsWith('jarro-') || templateMode.startsWith('custom-')) && (
 
 
                 <Box sx={{ p: 2, mb: 2.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: 'background.default' }}>
@@ -1221,7 +1365,7 @@ export default function QRGenerator() {
                           color="inherit"
                           sx={{ fontSize: '0.65rem', py: 0 }}
                           onClick={() => {
-                            const def = DEFAULT_TEMPLATE_PRESETS[templateMode];
+                            const def = allTemplates[templateMode];
                             if (def) updateCoords(def.size, def.x, def.y);
                           }}
                         >
@@ -1341,140 +1485,148 @@ export default function QRGenerator() {
                 Download & Export Options
               </Typography>
 
-              {/* Paper Format Selector */}
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>Paper Sheet Size & Layout</InputLabel>
-                <Select
-                  value={paperFormat}
-                  label="Paper Sheet Size & Layout"
-                  onChange={(e) => setPaperFormat(e.target.value)}
-                >
-                  <MenuItem value="12x18-inch">🖨️ Large Printing Sheet (12" x 18" Inches - 9 Standees / Sheet, 3x3 Grid)</MenuItem>
-                  <MenuItem value="12x18-inch-12">🖨️ Large Printing Sheet (12" x 18" Inches - 12 Standees / Sheet, 3x4 Grid)</MenuItem>
-                  <MenuItem value="a4-4-medium">📱 PhonePe / GPay Style Standee (A4 - 4 Big Standees / Sheet, 2x2 Grid)</MenuItem>
-                  <MenuItem value="a4-2-large">🏆 PhonePe / GPay Jumbo Standee (A4 - 2 Extra Large Standees / Sheet, 2x1 Grid)</MenuItem>
-                  <MenuItem value="a4-1-full">📜 Full Page Table Standee (A4 - 1 Massive Standee / Page, 1x1 Grid)</MenuItem>
-                  <MenuItem value="a4-6">📄 Standard Table Standee (A4 - 6 Standees / Sheet, 2x3 Grid)</MenuItem>
-                  <MenuItem value="a4-12">🏷️ Compact ID-Size Stickers (A4 - 12 Stickers / Sheet, 3x4 Grid)</MenuItem>
-                  <MenuItem value="a4-20">🏷️ High-Density Stickers (A4 - 20 Stickers / Sheet, 4x5 Grid)</MenuItem>
-                  <MenuItem value="20x12-inch">🏷️ Large Vinyl Sheet (20" x 12" - 32 Stickers / Sheet)</MenuItem>
-                  <MenuItem value="a3-24">📜 Large A3 Sheet (24 Stickers / Sheet - 4x6 Grid)</MenuItem>
-                  <MenuItem value="custom">⚙️ Custom Physical Card Size & Sheet Dimensions (Inches / mm)</MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Page Orientation Selector */}
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>Page Orientation (Vertical vs Horizontal)</InputLabel>
-                <Select
-                  value={pdfPageOrientation}
-                  label="Page Orientation (Vertical vs Horizontal)"
-                  onChange={(e) => setPdfPageOrientation(e.target.value)}
-                >
-                  <MenuItem value="auto">⚡ Auto-Fit Best Orientation (Recommended)</MenuItem>
-                  <MenuItem value="portrait">📱 Portrait (Vertical Sheet)</MenuItem>
-                  <MenuItem value="landscape">🖼️ Landscape (Horizontal Sheet)</MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Custom Physical Card & Sheet Dimension Inputs */}
-              {paperFormat === 'custom' && (
-                <Box sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                    <Typography variant="caption" fontWeight={700} color="primary">
-                      📐 Measurement Unit:
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Button
-                        size="small"
-                        variant={dimensionUnit === 'in' ? 'contained' : 'outlined'}
-                        onClick={() => setDimensionUnit('in')}
-                        sx={{ py: 0.2, px: 1, minWidth: 0, fontSize: '0.7rem', fontWeight: 700 }}
-                      >
-                        Inches (in)
-                      </Button>
-                      <Button
-                        size="small"
-                        variant={dimensionUnit === 'mm' ? 'contained' : 'outlined'}
-                        onClick={() => setDimensionUnit('mm')}
-                        sx={{ py: 0.2, px: 1, minWidth: 0, fontSize: '0.7rem', fontWeight: 700 }}
-                      >
-                        Millimeters (mm)
-                      </Button>
-                    </Box>
-                  </Box>
-
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                    Standee Card Dimensions ({dimensionUnit}):
+              {/* Custom Dimensions System */}
+              <Box sx={{ p: 2, mb: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700} color="primary">
+                    📐 Dimension System:
                   </Typography>
-                  <Grid container spacing={1} sx={{ mb: 1 }}>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label={`Card Width (${dimensionUnit})`}
-                        type="number"
-                        value={cardWidthVal}
-                        onChange={(e) => handleCardWidthChange(e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label={`Card Height (${dimensionUnit})`}
-                        type="number"
-                        value={cardHeightVal}
-                        onChange={(e) => handleCardHeightChange(e.target.value)}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={lockAspect}
-                        onChange={(e) => {
-                          setLockAspect(e.target.checked);
-                          if (e.target.checked && cardWidthVal > 0) {
-                            setCardHeightVal((parseFloat(cardWidthVal) * (4 / 3)).toFixed(2));
-                          }
-                        }}
-                      />
-                    }
-                    label={<Typography variant="caption" fontWeight={700}>🔒 Lock 3:4 Aspect Ratio (Auto Height)</Typography>}
-                  />
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                    📄 Full Paper Sheet Dimensions ({dimensionUnit}):
-                  </Typography>
-                  <Grid container spacing={1} sx={{ mb: 1 }}>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label={`Sheet Width (${dimensionUnit})`}
-                        type="number"
-                        value={customWidthVal}
-                        onChange={(e) => setCustomWidthVal(e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label={`Sheet Height (${dimensionUnit})`}
-                        type="number"
-                        value={customHeightVal}
-                        onChange={(e) => setCustomHeightVal(e.target.value)}
-                      />
-                    </Grid>
-                  </Grid>
+                  <ToggleButtonGroup
+                    size="small"
+                    value={dimensionUnit}
+                    exclusive
+                    onChange={(e, val) => handleUnitToggle(val)}
+                  >
+                    <ToggleButton value="in" sx={{ py: 0.3, px: 1.5, fontWeight: 700, fontSize: '0.75rem' }}>
+                      Inches (in)
+                    </ToggleButton>
+                    <ToggleButton value="mm" sx={{ py: 0.3, px: 1.5, fontWeight: 700, fontSize: '0.75rem' }}>
+                      Millimeters (mm)
+                    </ToggleButton>
+                  </ToggleButtonGroup>
                 </Box>
-              )}
+
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  📄 1. Full Printing Sheet Size ({dimensionUnit}):
+                </Typography>
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={`Sheet Width (${dimensionUnit})`}
+                      type="number"
+                      value={customWidthVal}
+                      onChange={(e) => setCustomWidthVal(e.target.value)}
+                      inputProps={{ step: 'any', min: 0.1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={`Sheet Height (${dimensionUnit})`}
+                      type="number"
+                      value={customHeightVal}
+                      onChange={(e) => setCustomHeightVal(e.target.value)}
+                      inputProps={{ step: 'any', min: 0.1 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  🏷️ 2. Standee Card / QR Sticker Size ({dimensionUnit}):
+                </Typography>
+                <Grid container spacing={1.5} sx={{ mb: 1 }}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={`Card Width (${dimensionUnit})`}
+                      type="number"
+                      value={cardWidthVal}
+                      onChange={(e) => handleCardWidthChange(e.target.value)}
+                      inputProps={{ step: 'any', min: 0.1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={`Card Height (${dimensionUnit})`}
+                      type="number"
+                      value={cardHeightVal}
+                      onChange={(e) => handleCardHeightChange(e.target.value)}
+                      inputProps={{ step: 'any', min: 0.1 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={lockAspect}
+                      onChange={(e) => {
+                        setLockAspect(e.target.checked);
+                        if (e.target.checked && cardWidthVal > 0) {
+                          setCardHeightVal((parseFloat(cardWidthVal) * (4 / 3)).toFixed(2));
+                        }
+                      }}
+                    />
+                  }
+                  label={<Typography variant="caption" fontWeight={700}>🔒 Lock 3:4 Aspect Ratio (Auto Height)</Typography>}
+                  sx={{ mb: 1.5 }}
+                />
+
+                <Grid container spacing={1.5} sx={{ mb: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={`✂️ Inter-Card Cutting Gap (${dimensionUnit})`}
+                      type="number"
+                      value={cardGapVal}
+                      onChange={(e) => setCardGapVal(e.target.value)}
+                      inputProps={{ step: 'any', min: 0 }}
+                      helperText="Spacing between cards for blade cutting (0 outer margin on sides)"
+                    />
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 1.5 }} />
+
+                <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ mb: 0.5, display: 'block' }}>
+                  📊 Calculated Grid Fit: {customCols} Cols × {customRows} Rows ({customCols * customRows} Standees / Sheet)
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, fontSize: '0.7rem' }}>
+                  ✓ Flush 0 Outer Margin (Cards align to outer sheet borders)
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Grid Cols"
+                      type="number"
+                      value={customCols}
+                      onChange={(e) => setCustomCols(e.target.value)}
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Grid Rows"
+                      type="number"
+                      value={customRows}
+                      onChange={(e) => setCustomRows(e.target.value)}
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
 
 
               {exporting && (
@@ -1487,16 +1639,33 @@ export default function QRGenerator() {
               )}
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<PdfIcon />}
-                  onClick={handleExportPDF}
-                  disabled={exporting || qrItems.length === 0}
-                  sx={{ justifyContent: 'flex-start', py: 1.2, fontWeight: 700 }}
-                >
-                  Download Printable QR Sheet (PDF)
-                </Button>
+                {(() => {
+                  const sW = parseFloat(customWidthVal) || 12;
+                  const sH = parseFloat(customHeightVal) || 18;
+                  const cW = parseFloat(cardWidthVal) || 3.5;
+                  const cH = parseFloat(cardHeightVal) || 4.66;
+                  const gap = parseFloat(cardGapVal) || 0.125;
+
+                  const maxColsThatFit = Math.max(1, Math.floor((sW + gap) / (cW + gap)));
+                  const maxRowsThatFit = Math.max(1, Math.floor((sH + gap) / (cH + gap)));
+                  const fitCols = Math.min(Math.max(parseInt(customCols) || 1, 1), maxColsThatFit);
+                  const fitRows = Math.min(Math.max(parseInt(customRows) || 1, 1), maxRowsThatFit);
+                  const perPage = fitCols * fitRows;
+                  const pages = Math.max(1, Math.ceil(qrItems.length / perPage));
+
+                  return (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<PdfIcon />}
+                      onClick={handleExportPDF}
+                      disabled={exporting || qrItems.length === 0}
+                      sx={{ justifyContent: 'flex-start', py: 1.2, fontWeight: 700 }}
+                    >
+                      Export PDF Sheet ({qrItems.length} QRs • {pages} {pages === 1 ? 'Page' : 'Pages'})
+                    </Button>
+                  );
+                })()}
 
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
@@ -1552,7 +1721,15 @@ export default function QRGenerator() {
                       onClick={() => setRightPanelView('preview')}
                       sx={{ fontWeight: 600, py: 0.4 }}
                     >
-                      🎯 Single Preview
+                      🎯 Single Designer
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={rightPanelView === 'sheet' ? 'contained' : 'outlined'}
+                      onClick={() => setRightPanelView('sheet')}
+                      sx={{ fontWeight: 600, py: 0.4 }}
+                    >
+                      🖨️ Print Sheet Preview
                     </Button>
                     <Button
                       size="small"
@@ -1700,6 +1877,193 @@ export default function QRGenerator() {
                   ) : (
                     <Typography variant="body2" color="text.secondary">
                       Click "Generate QR Codes" on the left to view live designer preview.
+                    </Typography>
+                  )}
+                </Box>
+              ) : rightPanelView === 'sheet' ? (
+                /* LIVE 1:1 PRINT SHEET PREVIEW */
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2 }}>
+                  {qrItems.length > 0 ? (
+                    <Box sx={{ width: '100%', maxWidth: 540, textAlign: 'center' }}>
+                      <Box sx={{ mb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                        <Typography variant="caption" color="primary" fontWeight={700}>
+                          📄 Custom Printing Sheet: {customWidthVal} × {customHeightVal} {dimensionUnit} ({customCols} Cols × {customRows} Rows)
+                        </Typography>
+                        <Chip
+                          label={`${Math.min(qrItems.length, (parseInt(customCols) || 3) * (parseInt(customRows) || 4))} Standees on Page 1`}
+                          size="small"
+                          color="info"
+                        />
+                      </Box>
+
+                      {/* Sheet Canvas Container */}
+                      {(() => {
+                        const sW = parseFloat(customWidthVal) || 12;
+                        const sH = parseFloat(customHeightVal) || 18;
+                        const cW = parseFloat(cardWidthVal) || 3.5;
+                        const cH = parseFloat(cardHeightVal) || 4.66;
+                        const gap = parseFloat(cardGapVal) || 0.125;
+
+                        const maxColsThatFit = Math.max(1, Math.floor((sW + gap) / (cW + gap)));
+                        const maxRowsThatFit = Math.max(1, Math.floor((sH + gap) / (cH + gap)));
+
+                        const activeCols = Math.min(Math.max(parseInt(customCols) || 1, 1), maxColsThatFit);
+                        const activeRows = Math.min(Math.max(parseInt(customRows) || 1, 1), maxRowsThatFit);
+                        const itemsPerPage = activeCols * activeRows;
+                        const totalPages = Math.max(1, Math.ceil(qrItems.length / itemsPerPage));
+                        const curPage = Math.min(previewPage, totalPages);
+
+                        const pageItems = qrItems.slice((curPage - 1) * itemsPerPage, curPage * itemsPerPage);
+
+                        return (
+                          <Box sx={{ width: '100%' }}>
+                            <Box sx={{ mb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                              <Typography variant="caption" color="primary" fontWeight={700}>
+                                📄 Sheet: {customWidthVal} × {customHeightVal} {dimensionUnit} ({activeCols} Cols × {activeRows} Rows = {itemsPerPage}/page)
+                              </Typography>
+
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip
+                                  label={`Total: ${qrItems.length} QRs (${totalPages} PDF ${totalPages === 1 ? 'Page' : 'Pages'})`}
+                                  size="small"
+                                  color="info"
+                                />
+
+                                {totalPages > 1 && (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#f1f5f9', px: 1, py: 0.3, borderRadius: 2 }}>
+                                    <Button
+                                      size="small"
+                                      disabled={curPage <= 1}
+                                      onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+                                      sx={{ minWidth: 24, p: 0, fontSize: '0.75rem', fontWeight: 800 }}
+                                    >
+                                      ◀
+                                    </Button>
+                                    <Typography variant="caption" fontWeight={700}>
+                                      Page {curPage} / {totalPages}
+                                    </Typography>
+                                    <Button
+                                      size="small"
+                                      disabled={curPage >= totalPages}
+                                      onClick={() => setPreviewPage((p) => Math.min(totalPages, p + 1))}
+                                      sx={{ minWidth: 24, p: 0, fontSize: '0.75rem', fontWeight: 800 }}
+                                    >
+                                      ▶
+                                    </Button>
+                                  </Box>
+                                )}
+                              </Box>
+                            </Box>
+
+                            <Card
+                              variant="outlined"
+                              sx={{
+                                width: '100%',
+                                aspectRatio: `${sW} / ${sH}`,
+                                maxHeight: 540,
+                                bgcolor: '#cbd5e1', // Slate background representing cutting gap lanes
+                                boxShadow: '0 8px 30px rgba(0,0,0,0.14)',
+                                p: 0,
+                                boxSizing: 'border-box',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                mx: 'auto',
+                                border: '2px solid #475569',
+                              }}
+                            >
+                              {pageItems.map((item, idx) => {
+                                const col = idx % activeCols;
+                                const row = Math.floor(idx / activeCols);
+
+                                const leftPct = (col * (cW + gap) / sW) * 100;
+                                const topPct = (row * (cH + gap) / sH) * 100;
+                                const widthPct = (cW / sW) * 100;
+                                const heightPct = (cH / sH) * 100;
+
+                                return (
+                                  <Box
+                                    key={item.index}
+                                    sx={{
+                                      position: 'absolute',
+                                      left: `${leftPct}%`,
+                                      top: `${topPct}%`,
+                                      width: `${widthPct}%`,
+                                      height: `${heightPct}%`,
+                                      boxSizing: 'border-box',
+                                      outline: '1px dashed rgba(37,99,235,0.5)',
+                                      bgcolor: '#ffffff',
+                                      overflow: 'hidden',
+                                      ...(customBgDataUrl
+                                        ? {
+                                            backgroundImage: `url(${customBgDataUrl})`,
+                                            backgroundSize: '100% 100%',
+                                            backgroundRepeat: 'no-repeat',
+                                          }
+                                        : {}),
+                                    }}
+                                  >
+                                    {customBgDataUrl ? (
+                                      <>
+                                        <Box
+                                          component="img"
+                                          src={item.dataUrl}
+                                          alt={`QR #${item.index}`}
+                                          sx={{
+                                            position: 'absolute',
+                                            top: `${qrYPercent}%`,
+                                            left: `${qrXPercent}%`,
+                                            width: `${qrSizePercent}%`,
+                                            aspectRatio: '1 / 1',
+                                            objectFit: 'contain',
+                                          }}
+                                        />
+                                        {showTokenText && (
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              position: 'absolute',
+                                              bottom: 2,
+                                              left: 0,
+                                              right: 0,
+                                              textAlign: 'center',
+                                              fontFamily: 'monospace',
+                                              fontSize: '0.55rem',
+                                              bgcolor: 'rgba(255,255,255,0.85)',
+                                              fontWeight: 700,
+                                            }}
+                                          >
+                                            ID: {item.token.substring(0, 8)}
+                                          </Typography>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <Box sx={{ p: 0.5, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ fontSize: '0.6rem' }}>
+                                          JARRo
+                                        </Typography>
+                                        <Box component="img" src={item.dataUrl} sx={{ width: '60%', mx: 'auto' }} />
+                                        <Typography variant="caption" sx={{ fontSize: '0.5rem', fontFamily: 'monospace' }}>
+                                          #{item.index}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                );
+                              })}
+                            </Card>
+
+                            {totalPages > 1 && (
+                              <Alert severity="info" sx={{ mt: 1.5, py: 0.5, borderRadius: 2, fontSize: '0.72rem' }}>
+                                💡 <strong>Multi-Page PDF Layout</strong>: Based on card size {cW}"×{cH}", <strong>{itemsPerPage} standees fit per page</strong>. All <strong>{qrItems.length} generated QR codes</strong> are in the PDF across <strong>{totalPages} pages</strong>. Use ◀ ▶ buttons above to preview each page.
+                              </Alert>
+                            )}
+                          </Box>
+                        );
+                      })()}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Click "Generate QR Codes" on the left to view print sheet preview.
                     </Typography>
                   )}
                 </Box>
@@ -1928,21 +2292,34 @@ export default function QRGenerator() {
               Choose from official JARRo bilingual standees or upload your custom background.
             </Typography>
           </Box>
-          {deletedTemplateIds.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Button
               size="small"
-              startIcon={<RestoreIcon />}
-              onClick={handleRestoreTemplates}
-              color="secondary"
-              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={() => setUploadDialogOpen(true)}
+              color="primary"
+              variant="contained"
+              sx={{ fontWeight: 700, borderRadius: 1.5 }}
             >
-              Restore ({deletedTemplateIds.length}) Deleted
+              ➕ Upload Template
             </Button>
-          )}
+            {deletedTemplateIds.length > 0 && (
+              <Button
+                size="small"
+                startIcon={<RestoreIcon />}
+                onClick={handleRestoreTemplates}
+                color="secondary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: 1.5 }}
+              >
+                Restore ({deletedTemplateIds.length})
+              </Button>
+            )}
+          </Box>
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
-            {Object.values(DEFAULT_TEMPLATE_PRESETS)
+            {Object.values(allTemplates)
               .filter((preset) => !deletedTemplateIds.includes(preset.id))
               .map((preset) => {
                 const isSelected = templateMode === preset.id;
@@ -2105,6 +2482,113 @@ export default function QRGenerator() {
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button variant="contained" onClick={() => setGalleryOpen(false)}>
             Close Gallery
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Upload Custom Template Modal Dialog */}
+      <Dialog
+        open={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 1 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <UploadIcon color="primary" />
+            <Typography variant="h6" fontWeight={800}>
+              Upload & Save Custom QR Template
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setUploadDialogOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <TextField
+              label="Template Name / Title"
+              placeholder="e.g. Restaurant Entrance Standee (13x19 in)"
+              value={newTemplateTitle}
+              onChange={(e) => setNewTemplateTitle(e.target.value)}
+              fullWidth
+              variant="outlined"
+              size="small"
+              helperText="Give your custom design template a recognizable name"
+            />
+
+            <Box>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 1 }}>
+                SELECT TEMPLATE BACKGROUND IMAGE
+              </Typography>
+              <Box
+                sx={{
+                  border: '2px dashed #cbd5e1',
+                  borderRadius: 2.5,
+                  p: 3,
+                  textAlign: 'center',
+                  bgcolor: '#f8fafc',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': { borderColor: '#2563eb', bgcolor: '#eff6ff' },
+                }}
+                component="label"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                      setNewTemplateImage(evt.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {newTemplateImage ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <img
+                      src={newTemplateImage}
+                      alt="Uploaded Preview"
+                      style={{ maxHeight: 220, maxWidth: '100%', borderRadius: 8, objectFit: 'contain', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Typography variant="caption" color="primary" fontWeight={700}>
+                      ✓ Image Selected (Click to change file)
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ py: 2 }}>
+                    <UploadIcon sx={{ fontSize: 44, color: '#94a3b8', mb: 1 }} />
+                    <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                      Click to Browse & Upload Image
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Supports JPG, PNG, WEBP high-resolution card artwork
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setUploadDialogOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!newTemplateImage}
+            onClick={handleSaveNewCustomTemplate}
+            startIcon={<CheckIcon />}
+            sx={{ fontWeight: 700, borderRadius: 2 }}
+          >
+            Save & Apply Template
           </Button>
         </DialogActions>
       </Dialog>
