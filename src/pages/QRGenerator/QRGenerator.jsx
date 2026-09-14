@@ -269,9 +269,9 @@ const DEFAULT_TEMPLATE_PRESETS = {
     badge: 'POPULAR',
     badgeColor: 'info',
     bg: getAssetPath('jarro_mascot_chef_qr_template.jpg'),
-    size: 48,
-    x: 37,
-    y: 30,
+    size: 47,
+    x: 41,
+    y: 39,
     isDeletable: true,
   },
   'mascot-fox': {
@@ -281,9 +281,9 @@ const DEFAULT_TEMPLATE_PRESETS = {
     badge: 'AMBER',
     badgeColor: 'secondary',
     bg: getAssetPath('jarro_mascot_fox_qr_template.jpg'),
-    size: 44,
-    x: 48,
-    y: 36,
+    size: 47,
+    x: 41,
+    y: 39,
     isDeletable: true,
   },
   'mascot-rocket': {
@@ -293,9 +293,9 @@ const DEFAULT_TEMPLATE_PRESETS = {
     badge: 'EXPRESS',
     badgeColor: 'primary',
     bg: getAssetPath('jarro_mascot_rocket_qr_template.jpg'),
-    size: 42,
-    x: 46,
-    y: 35,
+    size: 47,
+    x: 41,
+    y: 39,
     isDeletable: true,
   },
   'mascot-food-buddy': {
@@ -305,9 +305,9 @@ const DEFAULT_TEMPLATE_PRESETS = {
     badge: 'BISTRO',
     badgeColor: 'error',
     bg: getAssetPath('jarro_mascot_food_buddy_qr_template.jpg'),
-    size: 48,
+    size: 47,
     x: 41,
-    y: 28,
+    y: 39,
     isDeletable: true,
   },
   'vsafe-template': {
@@ -1782,7 +1782,13 @@ export default function QRGenerator() {
                           touchAction: 'none',
                         }}
                       >
-                        <Box sx={{ position: 'relative', width: '100%', pt: '133.33%' }}>
+                        {(() => {
+                          const cW = parseFloat(cardWidthVal) || 3.5;
+                          const cH = parseFloat(cardHeightVal) || 4.66;
+                          const cardAspectPct = (cW > 0 && cH > 0) ? (cH / cW) * 100 : 133.33;
+
+                          return (
+                            <Box sx={{ position: 'relative', width: '100%', pt: `${cardAspectPct}%` }}>
                           {customBgDataUrl ? (
                             <Box
                               component="img"
@@ -1838,7 +1844,9 @@ export default function QRGenerator() {
                               ID: {qrItems[0].token.substring(0, 12)}...
                             </Typography>
                           )}
-                        </Box>
+                            </Box>
+                          );
+                        })()}
                       </Card>
 
                       <Box sx={{ mt: 2.5, p: 2, bgcolor: 'background.default', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
