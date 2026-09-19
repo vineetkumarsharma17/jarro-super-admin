@@ -64,6 +64,7 @@ import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { ENV_CONFIG, getActiveEnvKey } from '../../services/api';
+import { qrTemplateService } from '../../services/qrTemplateService';
 
 // Helper function to generate 24-digit random numeric/hex QR token
 const generate24DigitToken = () => {
@@ -468,7 +469,10 @@ export default function QRGenerator() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [newTemplateTitle, setNewTemplateTitle] = useState('');
   const [newTemplateImage, setNewTemplateImage] = useState(null);
+  const [newTemplateFile, setNewTemplateFile] = useState(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [previewPage, setPreviewPage] = useState(1);
+  const updateCoordsTimerRef = useRef(null);
 
   const [customTemplates, setCustomTemplates] = useState(() => {
     try {
@@ -478,6 +482,28 @@ export default function QRGenerator() {
       return [];
     }
   });
+
+  // Fetch custom templates from backend DB on component mount
+  useEffect(() => {
+    async function loadDbTemplates() {
+      try {
+        const res = await qrTemplateService.getCustomTemplates();
+        if (res?.success && Array.isArray(res.templates)) {
+          setCustomTemplates(res.templates);
+          setTemplateCoords((prev) => {
+            const nextCoords = { ...prev };
+            res.templates.forEach((t) => {
+              nextCoords[t.id] = t;
+            });
+            return nextCoords;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load custom templates from DB:', err);
+      }
+    }
+    loadDbTemplates();
+  }, []);
 
   const allTemplates = useMemo(() => {
     const combined = { ...DEFAULT_TEMPLATE_PRESETS };
@@ -514,50 +540,86 @@ export default function QRGenerator() {
     return saved['jarro-official-whatsapp']?.y ?? 39;
   });
 
-  const handleSaveNewCustomTemplate = () => {
-    if (!newTemplateImage) return;
-    const id = `custom-${Date.now()}`;
-    const newPreset = {
-      id,
-      title: newTemplateTitle.trim() || 'Custom Uploaded Standee',
-      subtitle: 'User Custom Template Design',
-      badge: 'CUSTOM',
-      badgeColor: 'primary',
-      bg: newTemplateImage,
-      size: 47,
-      x: 41,
-      y: 39,
-      isDeletable: true,
-    };
+  const handleSaveNewCustomTemplate = async () => {
+    if (!newTemplateImage && !newTemplateFile) return;
+    setSavingTemplate(true);
 
-    const updated = [...customTemplates, newPreset];
-    setCustomTemplates(updated);
     try {
-      localStorage.setItem('jarro_custom_templates', JSON.stringify(updated));
-    } catch (err) {
-      console.error('Failed to save custom template to localStorage:', err);
-    }
+      let savedPreset;
+      if (newTemplateFile) {
+        const formData = new FormData();
+        formData.append('file', newTemplateFile);
+        formData.append('title', newTemplateTitle.trim() || 'Custom Uploaded Standee');
+        formData.append('size', 47);
+        formData.append('x', 41);
+        formData.append('y', 39);
+        const res = await qrTemplateService.createCustomTemplate(formData);
+        if (res?.success && res.template) {
+          savedPreset = res.template;
+        }
+      } else if (newTemplateImage) {
+        const res = await qrTemplateService.createCustomTemplate({
+          bgUrl: newTemplateImage,
+          title: newTemplateTitle.trim() || 'Custom Uploaded Standee',
+          size: 47,
+          x: 41,
+          y: 39,
+        });
+        if (res?.success && res.template) {
+          savedPreset = res.template;
+        }
+      }
 
-    setTemplateCoords((prev) => {
-      const up = { ...prev, [id]: newPreset };
+      if (!savedPreset) {
+        const id = `custom-${Date.now()}`;
+        savedPreset = {
+          id,
+          title: newTemplateTitle.trim() || 'Custom Uploaded Standee',
+          subtitle: 'User Custom Template Design',
+          badge: 'CUSTOM',
+          badgeColor: 'primary',
+          bg: newTemplateImage,
+          size: 47,
+          x: 41,
+          y: 39,
+          isDeletable: true,
+        };
+      }
+
+      const updated = [...customTemplates.filter((ct) => ct.id !== savedPreset.id), savedPreset];
+      setCustomTemplates(updated);
       try {
-        localStorage.setItem('jarro_qr_template_coords', JSON.stringify(up));
-      } catch (_) {}
-      return up;
-    });
+        localStorage.setItem('jarro_custom_templates', JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to save custom template to localStorage:', err);
+      }
 
-    setTemplateMode(id);
-    setCustomBgDataUrl(newTemplateImage);
-    setQrSizePercent(47);
-    setQrXPercent(41);
-    setQrYPercent(39);
+      setTemplateCoords((prev) => {
+        const up = { ...prev, [savedPreset.id]: savedPreset };
+        try {
+          localStorage.setItem('jarro_qr_template_coords', JSON.stringify(up));
+        } catch (_) {}
+        return up;
+      });
 
-    setUploadDialogOpen(false);
-    setNewTemplateTitle('');
-    setNewTemplateImage(null);
+      setTemplateMode(savedPreset.id);
+      setCustomBgDataUrl(savedPreset.bg || savedPreset.bgUrl);
+      setQrSizePercent(savedPreset.size || 47);
+      setQrXPercent(savedPreset.x || 41);
+      setQrYPercent(savedPreset.y || 39);
+
+      setUploadDialogOpen(false);
+      setNewTemplateTitle('');
+      setNewTemplateImage(null);
+      setNewTemplateFile(null);
+    } catch (err) {
+      console.error('Failed to save custom template to DB:', err);
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
-  const handleDeleteTemplate = (templateId, e) => {
+  const handleDeleteTemplate = async (templateId, e) => {
     if (e) e.stopPropagation();
 
     const isCustom = templateId.startsWith('custom-') && templateId !== 'custom-bg';
@@ -565,6 +627,12 @@ export default function QRGenerator() {
     let updatedDeleted = deletedTemplateIds;
 
     if (isCustom) {
+      try {
+        await qrTemplateService.deleteCustomTemplate(templateId);
+      } catch (err) {
+        console.error('Failed to delete template from DB:', err);
+      }
+
       // Completely remove custom template from customTemplates state & localStorage
       const updatedCustom = customTemplates.filter((ct) => ct.id !== templateId);
       setCustomTemplates(updatedCustom);
@@ -643,6 +711,21 @@ export default function QRGenerator() {
     if (newSize !== undefined) setQrSizePercent(sizeVal);
     if (newX !== undefined) setQrXPercent(xVal);
     if (newY !== undefined) setQrYPercent(yVal);
+
+    if (templateMode && templateMode.startsWith('custom-') && templateMode !== 'custom-bg') {
+      if (updateCoordsTimerRef.current) clearTimeout(updateCoordsTimerRef.current);
+      updateCoordsTimerRef.current = setTimeout(async () => {
+        try {
+          await qrTemplateService.updateCustomTemplateCoords(templateMode, {
+            size: sizeVal,
+            x: xVal,
+            y: yVal,
+          });
+        } catch (err) {
+          console.error('Failed to sync QR template coords to DB:', err);
+        }
+      }, 500);
+    }
 
     setTemplateCoords((prev) => {
       const updated = {
@@ -2564,6 +2647,7 @@ export default function QRGenerator() {
                   onChange={(e) => {
                     const file = e.target.files && e.target.files[0];
                     if (!file) return;
+                    setNewTemplateFile(file);
                     const reader = new FileReader();
                     reader.onload = (evt) => {
                       setNewTemplateImage(evt.target.result);
@@ -2598,17 +2682,17 @@ export default function QRGenerator() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setUploadDialogOpen(false)} color="inherit">
+          <Button onClick={() => setUploadDialogOpen(false)} color="inherit" disabled={savingTemplate}>
             Cancel
           </Button>
           <Button
             variant="contained"
-            disabled={!newTemplateImage}
+            disabled={!newTemplateImage || savingTemplate}
             onClick={handleSaveNewCustomTemplate}
-            startIcon={<CheckIcon />}
+            startIcon={savingTemplate ? <CircularProgress size={18} color="inherit" /> : <CheckIcon />}
             sx={{ fontWeight: 700, borderRadius: 2 }}
           >
-            Save & Apply Template
+            {savingTemplate ? 'Uploading...' : 'Save & Apply Template'}
           </Button>
         </DialogActions>
       </Dialog>
